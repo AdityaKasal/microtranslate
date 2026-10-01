@@ -1,0 +1,285 @@
+{
+  "_comment": "Peninsular -> neutral Latin American Spanish. 'g' = grammatical gender; a mismatch between src_g and tgt_g forces determiner and adjective repair. Only high-confidence pan-LatAm substitutions belong here; see notes/register.md for deliberately excluded regional forms.",
+  "entries": [
+    {
+      "src": [
+        "ordenador",
+        "ordenadores"
+      ],
+      "tgt": [
+        "computadora",
+        "computadoras"
+      ],
+      "src_g": "m",
+      "tgt_g": "f"
+    },
+    {
+      "src": [
+        "portátil",
+        "portátiles"
+      ],
+      "tgt": [
+        "laptop",
+        "laptops"
+      ],
+      "src_g": "m",
+      "tgt_g": "f"
+    },
+    {
+      "src": [
+        "móvil",
+        "móviles"
+      ],
+      "tgt": [
+        "celular",
+        "celulares"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "zumo",
+        "zumos"
+      ],
+      "tgt": [
+        "jugo",
+        "jugos"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "coche",
+        "coches"
+      ],
+      "tgt": [
+        "auto",
+        "autos"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "patata",
+        "patatas"
+      ],
+      "tgt": [
+        "papa",
+        "papas"
+      ],
+      "src_g": "f",
+      "tgt_g": "f"
+    },
+    {
+      "src": [
+        "nevera",
+        "neveras"
+      ],
+      "tgt": [
+        "refrigerador",
+        "refrigeradores"
+      ],
+      "src_g": "f",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "fontanero",
+        "fontaneros"
+      ],
+      "tgt": [
+        "plomero",
+        "plomeros"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "fontanera",
+        "fontaneras"
+      ],
+      "tgt": [
+        "plomera",
+        "plomeras"
+      ],
+      "src_g": "f",
+      "tgt_g": "f"
+    },
+    {
+      "src": [
+        "gafas"
+      ],
+      "tgt": [
+        "lentes"
+      ],
+      "src_g": "f",
+      "tgt_g": "m",
+      "plural_only": true
+    },
+    {
+      "src": [
+        "ascensor",
+        "ascensores"
+      ],
+      "tgt": [
+        "elevador",
+        "elevadores"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "tarta",
+        "tartas"
+      ],
+      "tgt": [
+        "pastel",
+        "pasteles"
+      ],
+      "src_g": "f",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "billete",
+        "billetes"
+      ],
+      "tgt": [
+        "boleto",
+        "boletos"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "melocotón",
+        "melocotones"
+      ],
+      "tgt": [
+        "durazno",
+        "duraznos"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "camarero",
+        "camareros"
+      ],
+      "tgt": [
+        "mesero",
+        "meseros"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "camarera",
+        "camareras"
+      ],
+      "tgt": [
+        "mesera",
+        "meseras"
+      ],
+      "src_g": "f",
+      "tgt_g": "f"
+    },
+    {
+      "src": [
+        "bañador",
+        "bañadores"
+      ],
+      "tgt": [
+        "traje de baño",
+        "trajes de baño"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "calcetines"
+      ],
+      "tgt": [
+        "medias"
+      ],
+      "src_g": "m",
+      "tgt_g": "f",
+      "plural_only": true
+    },
+    {
+      "src": [
+        "cerilla",
+        "cerillas"
+      ],
+      "tgt": [
+        "cerillo",
+        "cerillos"
+      ],
+      "src_g": "f",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "aparcamiento",
+        "aparcamientos"
+      ],
+      "tgt": [
+        "estacionamiento",
+        "estacionamientos"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "albaricoque",
+        "albaricoques"
+      ],
+      "tgt": [
+        "durazno",
+        "duraznos"
+      ],
+      "src_g": "m",
+      "tgt_g": "m"
+    },
+    {
+      "src": [
+        "judías verdes"
+      ],
+      "tgt": [
+        "ejotes"
+      ],
+      "src_g": "f",
+      "tgt_g": "m",
+      "plural_only": true
+    },
+    {
+      "src": [
+        "ordenador portátil"
+      ],
+      "tgt": [
+        "laptop"
+      ],
+      "src_g": "m",
+      "tgt_g": "f"
+    }
+  ],
+  "verbs": {
+    "_comment": "Regular -ar verbs: stem swap handles every inflected form.",
+    "aparcar": "estacionar",
+    "_excluded": {
+      "conducir": "manejar -- REMOVED: 'conducir a X' also means 'to lead to X', where manejar is simply wrong ('lo que conduce a' != 'lo que maneja a'). 'conducir' is standard and fully acceptable across Latin America, and 'licencia de conducir' is the normal LatAm term, so the register gain was not worth the meaning errors.",
+      "piso": "departamento -- REMOVED: 'piso' also means 'floor/storey' ('el tercer piso'), which must not change.",
+      "acera/piscina": "kept as-is: these are the neutral pan-LatAm forms already, not peninsular-only."
+    }
+  }
+}

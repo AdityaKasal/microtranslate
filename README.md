@@ -58,6 +58,60 @@ translates each clause as it completes, trailing the speaker by roughly
 1.5–2 s. Running on-device is what keeps that competitive: there is no network
 round trip in the loop.
 
+## The rest of the project
+
+`engine/` holds everything behind the page: the quantization pipeline, the
+Python implementation of the register layer, the evaluation harness and the
+measurements.
+
+```
+engine/scripts/neutro.py      the register layer (source of truth)
+engine/scripts/engine.py      CTranslate2 inference, no torch at runtime
+engine/scripts/bench.py       FLORES-200 BLEU/chrF + throughput
+engine/scripts/probe.py       register accuracy on 28 targeted probes
+engine/scripts/test_safety.py 30 false-positive regression tests
+engine/scripts/crosscheck.py  asserts neutro.js == neutro.py
+engine/data/lexicon.json      substitutions, with exclusions documented
+engine/notes/register.md      what the layer does, and what it refuses to do
+engine/notes/deploy.md        getting this onto Android and iOS
+```
+
+The desktop build uses a larger model than the web page can afford —
+`opus-mt-tc-big-en-es`, 240 MB at int8, BLEU 28.29 against the web build's
+26.38.
+
+| Build | Size | BLEU | Register probe |
+|---|---|---|---|
+| tc-big int8 + neutro | 240 MB | **28.29** | 28/28 |
+| tc-big int8, raw | 240 MB | 28.31 | 10/28 |
+| small int8 + neutro (this page) | 83 MB | 26.38 | 28/28 |
+
+## Tests
+
+No model weights, no network, a few seconds:
+
+```bash
+cd engine && ./run_tests.sh
+```
+
+Three things get checked: 30 strings that must survive the layer untouched
+(`ciudad`, `verdad`, `usted`, `recoger`, `piso`), the rewrites themselves, and
+that the JavaScript port matches the Python byte-for-byte across 2,096
+strings. Every one of those regressions came from benchmarking on real text —
+an early `-ís` rule turned `país` into `paen` and `París` into `Paren`, and
+`sed` (thirst) into `sean`.
+
+The heavier benchmarks need the model and FLORES-200:
+
+```bash
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python scripts/fetch_base.py
+.venv/bin/ct2-transformers-converter --model Helsinki-NLP/opus-mt-tc-big-en-es \
+  --output_dir models/ct2-en-es-int8 --quantization int8
+.venv/bin/python scripts/bench.py        # BLEU, chrF, throughput
+.venv/bin/python scripts/probe.py        # register accuracy
+```
+
 ## Running it elsewhere
 
 Two static files. Any static host works, with two requirements: **HTTPS**

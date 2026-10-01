@@ -1,0 +1,9 @@
+ctranslate2==4.8.2
+transformers==5.18.0
+sentencepiece==0.2.2
+sacrebleu==2.6.0
+torch==2.14.1
+huggingface_hub==1.33.0
+sacremoses
+fastapi==0.142.2
+uvicorn==0.54.0

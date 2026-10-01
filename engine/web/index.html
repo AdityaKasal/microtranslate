@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>microtranslate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#faf8f5; --panel:#fffefc; --ink:#1a1714; --ink-2:#514940;
+  --ink-3:#8b7f73; --rule:#e5ded4; --rule-2:#d6ccbe;
+  --mark-bg:#fdf0d5; --mark-line:#c8912f; --mark-ink:#6b4a0f;
+  --accent:#8a4b2a;
+  --ok:#3f6b4a;
+  --ui:"Inter",system-ui,sans-serif;
+  --serif:"Newsreader",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+:root:not([data-theme="light"]){ @media (prefers-color-scheme:dark){
+  --paper:#15130f; --panel:#1d1a16; --ink:#f2ece3; --ink-2:#bdb3a5;
+  --ink-3:#8a8073; --rule:#2e2a24; --rule-2:#3d382f;
+  --mark-bg:#3a2e14; --mark-line:#d9a845; --mark-ink:#f5dba2;
+  --accent:#d98b63; --ok:#7fb08c;
+}}
+:root[data-theme="dark"]{
+  --paper:#15130f; --panel:#1d1a16; --ink:#f2ece3; --ink-2:#bdb3a5;
+  --ink-3:#8a8073; --rule:#2e2a24; --rule-2:#3d382f;
+  --mark-bg:#3a2e14; --mark-line:#d9a845; --mark-ink:#f5dba2;
+  --accent:#d98b63; --ok:#7fb08c;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--ui);
+  -webkit-font-smoothing:antialiased; line-height:1.5;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px 64px}
+
+/* ---------- header ---------- */
+header{
+  display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+  padding:28px 0 18px;border-bottom:1px solid var(--rule);
+}
+h1{
+  font-family:var(--serif);font-weight:400;font-size:27px;letter-spacing:-.015em;
+  margin:0;
+}
+h1 em{font-style:italic;color:var(--accent)}
+.tag{
+  font-family:var(--mono);font-size:11px;color:var(--ink-3);
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.spacer{flex:1}
+.theme{
+  background:none;border:1px solid var(--rule-2);color:var(--ink-2);
+  border-radius:999px;width:30px;height:30px;cursor:pointer;font-size:13px;
+  display:grid;place-items:center;
+}
+.theme:hover{border-color:var(--ink-3);color:var(--ink)}
+
+/* ---------- controls ---------- */
+.controls{
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  padding:14px 0;border-bottom:1px solid var(--rule);
+}
+.grp{display:flex;align-items:center;gap:8px}
+.seg{display:flex;border:1px solid var(--rule-2);border-radius:8px;overflow:hidden}
+.seg button{
+  font-family:var(--ui);font-size:12.5px;font-weight:500;padding:6px 12px;
+  background:transparent;color:var(--ink-2);border:0;cursor:pointer;
+  border-right:1px solid var(--rule-2);
+}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+label.lbl{font-size:11px;color:var(--ink-3);font-family:var(--mono);
+  letter-spacing:.04em;text-transform:uppercase;margin-right:2px}
+.examples{display:flex;gap:6px;flex-wrap:wrap}
+.chip{
+  font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--rule-2);background:var(--panel);color:var(--ink-2);
+  font-family:var(--ui);
+}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- panes ---------- */
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);
+  border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-top:20px}
+.pane{background:var(--panel);padding:16px 18px 18px;min-height:280px;display:flex;
+  flex-direction:column}
+.pane h2{
+  font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 12px;
+}
+textarea{
+  flex:1;width:100%;border:0;outline:0;resize:none;background:transparent;
+  color:var(--ink);font-family:var(--serif);font-size:19px;line-height:1.6;
+  padding:0;
+}
+textarea::placeholder{color:var(--ink-3);font-style:italic}
+.out{flex:1;font-family:var(--serif);font-size:19px;line-height:1.6;
+  white-space:pre-wrap}
+.out .ln{margin:0 0 10px}
+.out .ln:last-child{margin:0}
+.ph{color:var(--ink-3);font-style:italic}
+mark{
+  background:var(--mark-bg);color:var(--mark-ink);
+  border-bottom:1.5px solid var(--mark-line);border-radius:2px;
+  padding:0 1px;cursor:help;
+}
+
+/* ---------- changes ---------- */
+.changes{margin-top:18px;border:1px solid var(--rule);border-radius:12px;
+  background:var(--panel);padding:14px 18px}
+.changes h3{font-family:var(--mono);font-size:10.5px;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 10px}
+.chg{display:flex;flex-wrap:wrap;gap:8px}
+.pair{font-family:var(--mono);font-size:12.5px;border:1px solid var(--rule-2);
+  border-radius:7px;padding:5px 10px;background:var(--paper)}
+.pair s{color:var(--ink-3);text-decoration-thickness:1px}
+.pair b{color:var(--mark-ink);font-weight:500}
+:root[data-theme="dark"] .pair b,
+:root:not([data-theme="light"]) .pair b{color:var(--mark-line)}
+.none{font-size:13px;color:var(--ink-3);font-style:italic;font-family:var(--serif)}
+
+/* ---------- telemetry ---------- */
+.tele{display:flex;flex-wrap:wrap;gap:0;margin-top:18px;border:1px solid var(--rule);
+  border-radius:12px;overflow:hidden;background:var(--panel)}
+.cell{flex:1 1 120px;padding:12px 16px;border-right:1px solid var(--rule)}
+.cell:last-child{border-right:0}
+.cell .k{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3)}
+.cell .v{font-family:var(--mono);font-size:17px;margin-top:3px;color:var(--ink)}
+.cell .v small{font-size:11px;color:var(--ink-3)}
+footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.6}
+footer code{font-family:var(--mono);font-size:11.5px}
+.busy{opacity:.45;transition:opacity .15s}
+@media(max-width:720px){
+  .panes{grid-template-columns:1fr}
+  .pane{min-height:190px}
+  h1{font-size:23px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>micro<em>translate</em></h1>
+    <span class="tag">en → español neutro · on-device</span>
+    <span class="spacer"></span>
+    <button class="theme" id="theme" title="Toggle theme">◐</button>
+  </header>
+
+  <div class="controls">
+    <div class="grp">
+      <label class="lbl">model</label>
+      <div class="seg" id="model">
+        <button data-v="big" aria-pressed="true">tc-big</button>
+        <button data-v="small" aria-pressed="false">small</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label class="lbl">decode</label>
+      <div class="seg" id="beam">
+        <button data-v="1" aria-pressed="false">greedy</button>
+        <button data-v="4" aria-pressed="true">beam 4</button>
+      </div>
+    </div>
+    <span class="spacer"></span>
+    <div class="examples" id="ex">
+      <button class="chip" data-k="pen">peninsular vocabulary</button>
+      <button class="chip" data-k="vos">vosotros</button>
+      <button class="chip" data-k="serv">service</button>
+      <button class="chip" data-k="trap">false friends</button>
+    </div>
+  </div>
+
+  <div class="panes">
+    <div class="pane">
+      <h2>English</h2>
+      <textarea id="src" placeholder="Type English. One sentence per line…"
+        spellcheck="false"></textarea>
+    </div>
+    <div class="pane">
+      <h2>Español neutro <span id="rawtog" style="text-transform:none;
+        letter-spacing:0;cursor:pointer;color:var(--accent);font-weight:500">
+        · show raw</span></h2>
+      <div class="out" id="out"><span class="ph">Translation appears here.</span></div>
+    </div>
+  </div>
+
+  <div class="changes">
+    <h3>What the register layer changed</h3>
+    <div class="chg" id="chg"><span class="none">Nothing yet.</span></div>
+  </div>
+
+  <div class="tele">
+    <div class="cell"><div class="k">latency</div><div class="v" id="t-ms">—</div></div>
+    <div class="cell"><div class="k">throughput</div><div class="v" id="t-cps">—</div></div>
+    <div class="cell"><div class="k">model size</div><div class="v" id="t-mb">—</div></div>
+    <div class="cell"><div class="k">BLEU <small>flores</small></div><div class="v" id="t-bleu">—</div></div>
+    <div class="cell"><div class="k">layer cost</div><div class="v">0.58<small> ms/sent</small></div></div>
+  </div>
+
+  <footer>
+    opus-mt-tc-big-en-es quantized to int8 with CTranslate2, plus a rewriting
+    layer that forces output into <em>español neutro</em>. Highlighted words
+    are the layer's edits — hover to see what the model originally produced.
+    Running locally; nothing leaves this machine.
+  </footer>
+</div>
+
+<script>
+const EX = {
+  pen: "I need to turn on the computer.\nWe parked the car on the street.\nPut the milk in the fridge and the potatoes on the table.\nThe plumber lost his glasses in the elevator.\nThe waiter brought a slice of cake and a bus ticket.",
+  vos: "Do you all have your tickets?\nCome here, all of you.\nListen and tell me what you all think.\nWhere did you all park your cars?\nEat the cake and drink the juice.",
+  serv: "Good morning, and welcome to the service.\nListen, all of you. Come here and pray with me.\nTake your seats and open your books.\nYou all are very welcome here today.",
+  trap: "France is the seventh country in the European Union.\nThey travelled back to Paris in a carriage.\nI am very thirsty after running.\nThat leads to better results.\nI need my driver's licence.\nA car bomb exploded downtown."
+};
+const $ = s => document.querySelector(s);
+const src = $("#src"), out = $("#out"), chg = $("#chg");
+let model = "big", beam = 4, showRaw = false, last = null, meta = null;
+
+// theme
+const sysDark = matchMedia("(prefers-color-scheme: dark)");
+let theme = localStorage.getItem("mt-theme") || "auto";
+function applyTheme(){
+  if(theme === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", theme);
+}
+try{ applyTheme(); }catch(e){}
+$("#theme").onclick = () => {
+  theme = theme === "auto" ? (sysDark.matches ? "light" : "dark")
+        : theme === "dark" ? "light" : "dark";
+  try{ localStorage.setItem("mt-theme", theme); }catch(e){}
+  applyTheme();
+};
+
+function seg(id, set){
+  document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => {
+    document.querySelectorAll(`#${id} button`)
+      .forEach(x => x.setAttribute("aria-pressed", x === b));
+    set(b.dataset.v); run();
+  });
+}
+seg("model", v => model = v);
+seg("beam", v => beam = +v);
+
+document.querySelectorAll("#ex .chip").forEach(c => c.onclick = () => {
+  src.value = EX[c.dataset.k]; run();
+});
+$("#rawtog").onclick = () => {
+  showRaw = !showRaw;
+  $("#rawtog").textContent = showRaw ? " · show neutro" : " · show raw";
+  render();
+};
+
+function esc(s){ return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+function render(){
+  if(!last){ return; }
+  out.innerHTML = last.lines.map(l => {
+    if(showRaw) return `<p class="ln">${esc(l.raw)}</p>`;
+    const html = l.segments.map(s => s.changed
+      ? `<mark title="model produced: ${esc(s.was || "—")}">${esc(s.text)}</mark>`
+      : esc(s.text)).join(" ");
+    return `<p class="ln">${html}</p>`;
+  }).join("");
+
+  const pairs = [];
+  last.lines.forEach(l => l.segments.forEach(s => {
+    if(s.changed && s.was) pairs.push([s.was, s.text]);
+  }));
+  // drop punctuation both sides share, so pairs read "ordenador → computadora"
+  const trim = ([a,b]) => {
+    const re = /[.,;:!?¡¿»"']+$/;
+    const ta = (a.match(re)||[""])[0], tb = (b.match(re)||[""])[0];
+    return ta && ta === tb ? [a.replace(re,""), b.replace(re,"")] : [a,b];
+  };
+  chg.innerHTML = pairs.length
+    ? pairs.map(p => trim(p)).map(([a,b]) => `<span class="pair"><s>${esc(a)}</s> → <b>${esc(b)}</b></span>`).join("")
+    : `<span class="none">No peninsular forms in this output — the model got it right unaided.</span>`;
+
+  $("#t-ms").innerHTML = `${last.ms_per_sentence}<small> ms/sent</small>`;
+  $("#t-cps").innerHTML = `${last.chars_per_s.toLocaleString()}<small> ch/s</small>`;
+  const m = meta && meta.models.find(x => x.id === last.model);
+  if(m){
+    $("#t-mb").innerHTML = `${m.mb}<small> MB</small>`;
+    $("#t-bleu").textContent = m.bleu.toFixed(2);
+  }
+}
+
+let timer = null, seq = 0;
+async function run(){
+  const text = src.value.trim();
+  if(!text){
+    last = null;
+    out.innerHTML = '<span class="ph">Translation appears here.</span>';
+    chg.innerHTML = '<span class="none">Nothing yet.</span>';
+    return;
+  }
+  const mine = ++seq;
+  out.classList.add("busy");
+  try{
+    const r = await fetch("/api/translate", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ text, model, beam })
+    });
+    if(!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    if(mine !== seq) return;
+    last = data; render();
+  }catch(e){
+    if(mine === seq) out.innerHTML = `<span class="ph">Translation failed (${esc(String(e.message||e))}).</span>`;
+  }finally{
+    if(mine === seq) out.classList.remove("busy");
+  }
+}
+src.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 450); });
+
+fetch("/api/meta").then(r => r.json()).then(d => { meta = d; }).catch(()=>{});
+src.value = EX.pen; run();
+</script>
+</body>
+</html>
