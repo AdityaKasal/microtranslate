@@ -743,8 +743,10 @@ function restore(text, map){
   return map.length ? text.replace(/@(\d+)@/g, (m,i) => map[+i] ?? m) : text;
 }
 
-// Whisper maps unknown names onto English words it does know. If a listed name
-// is a close enough match for a span of the transcript, put the name back.
+// Whisper maps unknown names onto English words it does know: "Kasal" comes
+// back as "Castle". Edit distance on spelling misses that (0.50), because the
+// substitution is by SOUND. "castle" is said /kasl/ -- the t is silent -- so a
+// phonetic key matches it to "kasal" exactly.
 function lev(a,b){
   const d = Array.from({length:a.length+1}, (_,i) => [i, ...Array(b.length).fill(0)]);
   for(let j=0;j<=b.length;j++) d[0][j]=j;
@@ -752,20 +754,38 @@ function lev(a,b){
     d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
   return d[a.length][b.length];
 }
+const sim = (a,b) => (a && b) ? 1 - lev(a,b)/Math.max(a.length,b.length) : 0;
+
+function phon(w){
+  let x = w.toLowerCase().replace(/[^a-z]/g,"");
+  if(!x) return "";
+  x = x.replace(/^(kn|gn|pn|ae|wr)/,"n").replace(/^x/,"s").replace(/^wh/,"w");
+  x = x.replace(/stl/g,"sl").replace(/stn/g,"sn")      // castle, fasten: silent t
+       .replace(/mb$/,"m").replace(/kn/g,"n");
+  x = x.replace(/ck/g,"k").replace(/ph/g,"f").replace(/sch/g,"sk")
+       .replace(/ch/g,"x").replace(/sh/g,"x").replace(/th/g,"0")
+       .replace(/c(?=[iey])/g,"s").replace(/c/g,"k")
+       .replace(/q/g,"k").replace(/z/g,"s").replace(/x/g,"ks")
+       .replace(/v/g,"f").replace(/w(?![aeiou])/g,"").replace(/y(?![aeiou])/g,"")
+       .replace(/g(?=[iey])/g,"j").replace(/dg/g,"j");
+  x = x[0] + x.slice(1).replace(/[aeiou]/g,"");        // vowels matter only first
+  return x.replace(/(.)\1+/g,"$1");
+}
+
 function repairNames(text){
   const names = nameList(); if(!names.length) return text;
   const words = text.split(/(\s+)/);
   for(const n of names){
     const nw = n.split(/\s+/).length;
+    const pn = phon(n), bare = n.toLowerCase().replace(/[^a-z]/g,"");
     for(let i=0;i<words.length;i+=2){
       const span = words.slice(i, i+nw*2-1).join("");
       if(!span.trim()) continue;
       const a = span.toLowerCase().replace(/[^a-z]/g,"");
-      const b = n.toLowerCase().replace(/[^a-z]/g,"");
-      if(!a || !b) continue;
-      const sim = 1 - lev(a,b)/Math.max(a.length,b.length);
-      // conservative: only swap on a strong match, so ordinary words are safe
-      if(sim >= 0.62 && Math.abs(a.length-b.length) <= 4){
+      if(!a) continue;
+      if(a === bare) break;                      // already correct
+      // phonetic first, spelling as a fallback
+      if(sim(phon(span), pn) >= 0.70 || sim(a, bare) >= 0.72){
         const tail = span.match(/[.,!?;:]$/);
         words.splice(i, nw*2-1, n + (tail ? tail[0] : ""));
         break;
