@@ -163,8 +163,8 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
       <div class="grp">
         <label class="lbl">hearing</label>
         <div class="seg" id="asrsize">
-          <button data-v="tiny" aria-pressed="true">fast</button>
-          <button data-v="base" aria-pressed="false">accurate</button>
+          <button data-v="base" aria-pressed="true">accurate</button>
+          <button data-v="tiny" aria-pressed="false">fast</button>
         </div>
       </div>
       <div class="grp">
@@ -273,8 +273,8 @@ self.onmessage = async (e) => {
   if (type === "loadAsr") {
     try {
       asr = await pipeline("automatic-speech-recognition",
-        payload && payload.size === "base" ? "Xenova/whisper-base.en"
-                                           : "Xenova/whisper-tiny.en", {
+        payload && payload.size === "tiny" ? "Xenova/whisper-tiny.en"
+                                           : "Xenova/whisper-base.en", {
         dtype: "q8",
         progress_callback: (p) => self.postMessage({ type:"progress", payload:p }),
       });
@@ -509,7 +509,7 @@ const MAX_SEG_MS = 5000;  // force a cut if someone never pauses
 const RATE = 16000;       // whisper's sample rate; AudioContext resamples for us
 
 let actx=null, node=null, micStream=null, listening=false;
-let asrReady=false, asrLoading=false, asrSize="tiny";
+let asrReady=false, asrLoading=false, asrSize="base";
 let buf=[], bufLen=0, speechLen=0, silenceLen=0, inSpeech=false;
 let frames=0, peak=0, health=null, floor_=0.006;
 const queue=[]; let busy=false, segNo=0;
@@ -526,7 +526,7 @@ async function startListening(){
   if(!asrReady){
     if(asrLoading) return;
     asrLoading = true;
-    status(`downloading the speech model (~${asrSize==="base"?"80":"40"} MB, once)…`);
+    status(`downloading the speech model (~${asrSize==="tiny"?"40":"80"} MB, once)…`);
     worker.postMessage({ type:"loadAsr", payload:{ size: asrSize } });
     return;
   }
@@ -679,8 +679,8 @@ document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
     asrReady = false;               // a different model has to be fetched
     asrLoading = false;
     status(asrSize === "base"
-      ? "set to the larger model — press Start listening to fetch it (~80 MB)"
-      : "set to the small model — press Start listening");
+      ? "set to the accurate model — press Start listening (~80 MB)"
+      : "set to the fast model — press Start listening (~40 MB)");
   }
 });
 $("#mic").onclick = () => listening ? stopListening() : startListening();
