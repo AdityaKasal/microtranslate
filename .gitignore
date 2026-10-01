@@ -1,7 +1,11 @@
+# build artefacts and downloads, not the repo's business
 .venv/
 models/
-data/flores200_dataset/
-bench/
+engine/models/
+engine/data/flores200_dataset/
 __pycache__/
 *.pyc
 .DS_Store
+
+# engine/bench holds the FLORES hypotheses the cross-check runs against,
+# so it is deliberately tracked.
