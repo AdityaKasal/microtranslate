@@ -1,0 +1,7 @@
+.venv/
+models/
+data/flores200_dataset/
+bench/
+__pycache__/
+*.pyc
+.DS_Store
