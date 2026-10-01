@@ -133,6 +133,10 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
 .err{color:#b4452c;font-size:13.5px;margin-top:12px;font-family:var(--mono)}
 @media(max-width:720px){.panes{grid-template-columns:1fr}.pane{min-height:190px}
   h1{font-size:23px}.gate{padding:24px 18px}}
+  .names{background:var(--card);border:1px solid var(--line);color:var(--ink);
+    border-radius:999px;padding:.34rem .8rem;font:inherit;font-size:.82rem;
+    min-width:16rem;outline:none}
+  .names:focus{border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -163,9 +167,14 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
       <div class="grp">
         <label class="lbl">hearing</label>
         <div class="seg" id="asrsize">
-          <button data-v="base" aria-pressed="true">accurate</button>
-          <button data-v="tiny" aria-pressed="false">fast</button>
+          <button data-v="best" aria-pressed="true">accurate</button>
+          <button data-v="fast" aria-pressed="false">fast</button>
         </div>
+      </div>
+      <div class="grp">
+        <label class="lbl">names</label>
+        <input id="names" class="names" spellcheck="false"
+               placeholder="Aditya Kasal, Guadalupe, ..." />
       </div>
       <div class="grp">
         <label class="lbl">examples</label>
@@ -236,6 +245,10 @@ const EX = {
 const $ = s => document.querySelector(s);
 const gate=$("#gate"), app=$("#app"), src=$("#src"), out=$("#out"), chg=$("#chg");
 let worker=null, ready=false, showRaw=false, last=null;
+// proper nouns the user wants protected; declared up here because the input
+// wiring runs before the helpers further down
+let NAMES = [];
+try { NAMES = JSON.parse(localStorage.getItem("mt.names") || "[]"); } catch {}
 
 /* theme */
 const sysDark = matchMedia("(prefers-color-scheme: dark)");
@@ -255,7 +268,7 @@ $("#theme").onclick = () => {
 const WORKER_SRC = `
 import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
 env.allowLocalModels = false;
-let pipe = null, asr = null;
+let pipe = null, asr = null, asrName = "";
 self.onmessage = async (e) => {
   const { type, payload } = e.data;
   if (type === "load") {
@@ -272,9 +285,9 @@ self.onmessage = async (e) => {
   }
   if (type === "loadAsr") {
     try {
-      asr = await pipeline("automatic-speech-recognition",
-        payload && payload.size === "tiny" ? "Xenova/whisper-tiny.en"
-                                           : "Xenova/whisper-base.en", {
+      asrName = payload && payload.size === "fast" ? "Xenova/whisper-base.en"
+                                                   : "Xenova/whisper-small.en";
+      asr = await pipeline("automatic-speech-recognition", asrName, {
         dtype: "q8",
         progress_callback: (p) => self.postMessage({ type:"progress", payload:p }),
       });
@@ -287,7 +300,10 @@ self.onmessage = async (e) => {
   if (type === "transcribe") {
     try {
       const t0 = performance.now();
-      const r = await asr(payload.audio, { chunk_length_s: 30, stride_length_s: 5 });
+      const r = await asr(payload.audio, {
+        chunk_length_s: 30, stride_length_s: 5,
+        num_beams: asrName.includes("small") ? 4 : 2,   // beams buy accuracy
+        condition_on_previous_text: false });
       self.postMessage({ type:"transcript",
         payload:{ id: payload.id, text:(r.text||"").trim(), ms: performance.now()-t0 } });
     } catch (err) {
@@ -317,7 +333,7 @@ function startWorker(){
   return w;
 }
 
-const seen = new Map(), asrJobs = new Map();
+const seen = new Map(), asrJobs = new Map(), nameMaps = new Map();
 // Small Whisper models emit stock phrases when handed a breath, a click or
 // near-silence. Drop them rather than translating noise.
 const JUNK = new Set(["oh","ah","uh","um","mm","hm","hmm","you","bye","so",
@@ -370,6 +386,8 @@ function handle({type, payload}){
     const sid = +String(payload.id).slice(1);
     const job = asrJobs.get(sid); asrJobs.delete(sid);
     const raw = payload.outs[0] || "";
+    const pm = (nameMaps.get(payload.id) || [[]])[0] || [];
+    raw = restore(raw, pm); nameMaps.delete(payload.id);
     const neu = toNeutro(tidy(raw));
     const el = document.getElementById("seg"+sid);
     if(el){
@@ -399,6 +417,9 @@ function handle({type, payload}){
     const job = pending.get(payload.id);
     pending.delete(payload.id);
     if(!job || payload.id !== seq) return;
+    const pms = nameMaps.get(payload.id) || [];
+    payload.outs = payload.outs.map((o,i) => restore(o, pms[i] || []));
+    nameMaps.delete(payload.id);
     const neu = payload.outs.map(o => toNeutro(tidy(o)));
     last = { lines: payload.outs.map((raw,i) => ({ raw: tidy(raw), neutro: neu[i] })),
              ms: payload.ms, chars: job.chars, n: payload.outs.length };
@@ -419,13 +440,17 @@ function handle({type, payload}){
     const job = jobs.get(payload.id); jobs.delete(payload.id);
     busy = false;
     const el = document.getElementById("seg"+payload.id);
-    const text = (payload.text||"").replace(/\[.*?\]|\(.*?\)|♪/g,"").trim();
+    let text = (payload.text||"").replace(/\[.*?\]|\(.*?\)|♪/g,"").trim();
+    text = repairNames(text);
     if(!text || isJunk(text)){ el && el.remove(); pump(); return; }
     if(el){ el.querySelector(".en").textContent = text;
             el.querySelector(".es").textContent = "translating…"; }
     $("#t-asr").innerHTML = `${payload.ms.toFixed(0)}<small> ms</small>`;
     asrJobs.set(payload.id, { ...job, text, asrMs: payload.ms });
-    worker.postMessage({ type:"translate", payload:{ id:"s"+payload.id, lines:[text], fast:true } });
+    const pr = protect(text);
+    nameMaps.set("s"+payload.id, [pr.map]);
+    worker.postMessage({ type:"translate",
+                         payload:{ id:"s"+payload.id, lines:[pr.text], fast:true } });
     pump();
   }
   else if(type === "error") fail(payload);
@@ -503,13 +528,13 @@ function render(){
  * button, cut the audio at natural pauses (energy-based voice activity),
  * then transcribe -> translate -> speak each clause as it lands.
  */
-const SILENCE_MS = 420;   // pause that ends a clause
-const MIN_SPEECH_MS = 420; // ignore coughs, clicks and breaths
-const MAX_SEG_MS = 5000;  // force a cut if someone never pauses
+const SILENCE_MS = 750;   // a real clause boundary, not a mid-phrase breath
+const MIN_SPEECH_MS = 500; // ignore coughs, clicks and breaths
+const MAX_SEG_MS = 9000;  // force a cut if someone never pauses
 const RATE = 16000;       // whisper's sample rate; AudioContext resamples for us
 
 let actx=null, node=null, micStream=null, listening=false;
-let asrReady=false, asrLoading=false, asrSize="base";
+let asrReady=false, asrLoading=false, asrSize="best";
 let buf=[], bufLen=0, speechLen=0, silenceLen=0, inSpeech=false;
 let frames=0, peak=0, health=null, floor_=0.006;
 const queue=[]; let busy=false, segNo=0;
@@ -526,7 +551,7 @@ async function startListening(){
   if(!asrReady){
     if(asrLoading) return;
     asrLoading = true;
-    status(`downloading the speech model (~${asrSize==="tiny"?"40":"80"} MB, once)…`);
+    status(`downloading the speech model (~${asrSize==="fast"?"80":"250"} MB, once)…`);
     worker.postMessage({ type:"loadAsr", payload:{ size: asrSize } });
     return;
   }
@@ -678,16 +703,78 @@ document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
     if(listening) stopListening();
     asrReady = false;               // a different model has to be fetched
     asrLoading = false;
-    status(asrSize === "base"
-      ? "set to the accurate model — press Start listening (~80 MB)"
-      : "set to the fast model — press Start listening (~40 MB)");
+    status(asrSize === "best"
+      ? "set to the accurate model — press Start listening (~250 MB)"
+      : "set to the fast model — press Start listening (~80 MB)");
   }
 });
+const namesEl = $("#names");
+if(namesEl){
+  namesEl.value = NAMES.join(", ");
+  namesEl.addEventListener("input", () => {
+    NAMES = namesEl.value.split(",").map(x => x.trim()).filter(Boolean);
+    try{ localStorage.setItem("mt.names", JSON.stringify(NAMES)); }catch{}
+  });
+}
 $("#mic").onclick = () => listening ? stopListening() : startListening();
 
 /* ---- typed-text path (unchanged) ---- */
 let seq = 0, timer = null;
 const pending = new Map();
+
+// ---- proper nouns -------------------------------------------------------
+// Names must survive translation intact: "Kasal" became "Castillo" because the
+// model treats it as the common noun "castle". Swap each name for a token the
+// model passes through (@0@ survives opus-mt in every position tested), then
+// put the name back afterwards.
+function nameList(){
+  return NAMES.filter(Boolean).sort((a,b) => b.length - a.length);
+}
+function protect(text){
+  const map = [];
+  let out = text;
+  nameList().forEach((n) => {
+    const re = new RegExp(`(?<!\\w)${n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}(?!\\w)`, "gi");
+    out = out.replace(re, (hit) => { map.push(hit); return `@${map.length-1}@`; });
+  });
+  return { text: out, map };
+}
+function restore(text, map){
+  return map.length ? text.replace(/@(\d+)@/g, (m,i) => map[+i] ?? m) : text;
+}
+
+// Whisper maps unknown names onto English words it does know. If a listed name
+// is a close enough match for a span of the transcript, put the name back.
+function lev(a,b){
+  const d = Array.from({length:a.length+1}, (_,i) => [i, ...Array(b.length).fill(0)]);
+  for(let j=0;j<=b.length;j++) d[0][j]=j;
+  for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++)
+    d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return d[a.length][b.length];
+}
+function repairNames(text){
+  const names = nameList(); if(!names.length) return text;
+  const words = text.split(/(\s+)/);
+  for(const n of names){
+    const nw = n.split(/\s+/).length;
+    for(let i=0;i<words.length;i+=2){
+      const span = words.slice(i, i+nw*2-1).join("");
+      if(!span.trim()) continue;
+      const a = span.toLowerCase().replace(/[^a-z]/g,"");
+      const b = n.toLowerCase().replace(/[^a-z]/g,"");
+      if(!a || !b) continue;
+      const sim = 1 - lev(a,b)/Math.max(a.length,b.length);
+      // conservative: only swap on a strong match, so ordinary words are safe
+      if(sim >= 0.62 && Math.abs(a.length-b.length) <= 4){
+        const tail = span.match(/[.,!?;:]$/);
+        words.splice(i, nw*2-1, n + (tail ? tail[0] : ""));
+        break;
+      }
+    }
+  }
+  return words.join("");
+}
+
 function run(){
   if(!ready || listening) return;   // never overwrite live streaming output
   const text = src.value.trim();
@@ -697,7 +784,10 @@ function run(){
   const id = ++seq;
   pending.set(id, { chars: lines.reduce((n,l)=>n+l.length,0) });
   out.classList.add("busy");
-  worker.postMessage({ type:"translate", payload:{ id, lines, fast:false } });
+  const prot = lines.map(protect);
+  nameMaps.set(id, prot.map(p => p.map));
+  worker.postMessage({ type:"translate",
+                       payload:{ id, lines: prot.map(p => p.text), fast:false } });
 }
 src.addEventListener("input", () => {
   clearTimeout(timer);
