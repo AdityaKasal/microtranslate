@@ -161,6 +161,13 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
   <div class="app" id="app">
     <div class="controls">
       <div class="grp">
+        <label class="lbl">hearing</label>
+        <div class="seg" id="asrsize">
+          <button data-v="tiny" aria-pressed="true">fast</button>
+          <button data-v="base" aria-pressed="false">accurate</button>
+        </div>
+      </div>
+      <div class="grp">
         <label class="lbl">examples</label>
         <div class="examples" id="ex">
           <button class="chip" data-k="pen">peninsular vocabulary</button>
@@ -309,6 +316,16 @@ function startWorker(){
 }
 
 const seen = new Map(), asrJobs = new Map();
+// Small Whisper models emit stock phrases when handed a breath, a click or
+// near-silence. Drop them rather than translating noise.
+const JUNK = new Set(["oh","ah","uh","um","mm","hm","hmm","you","bye","so",
+  "thank you","thanks","thanks for watching","thanks for watching!","okay","ok",
+  "yeah","yes","no","the","a","and","bye bye","goodbye","please subscribe",
+  "subscribe","music","applause","silence","blank_audio"]);
+const isJunk = (t) => {
+  const k = t.toLowerCase().replace(/[^a-z\s']/g, "").trim();
+  return !k || k.length < 2 || JUNK.has(k);
+};
 // the quantized model occasionally emits a doubled sentence-final period
 const tidy = (t) => t.replace(/([.!?])\1+/g, "$1").replace(/\s+([.,;:!?])/g, "$1").trim();
 function markup(raw, neu){
@@ -366,6 +383,13 @@ function handle({type, payload}){
       $("#t-ms").innerHTML = `${payload.ms.toFixed(0)}<small> ms</small>`;
       out.scrollTop = out.scrollHeight;
     }
+    const ps = segs(tidy(raw), neu).filter(x => x.changed && x.was)
+                 .map(x => [x.was, x.text]);
+    if(ps.length){
+      if(chg.querySelector(".none")) chg.innerHTML = "";
+      chg.insertAdjacentHTML("beforeend", ps.map(([a,b]) =>
+        `<span class="pair"><s>${esc(a)}</s> → <b>${esc(b)}</b></span>`).join(""));
+    }
     if($("#autosay").checked) say(neu);
     return;
   }
@@ -393,8 +417,8 @@ function handle({type, payload}){
     const job = jobs.get(payload.id); jobs.delete(payload.id);
     busy = false;
     const el = document.getElementById("seg"+payload.id);
-    const text = (payload.text||"").replace(/^\s*\[?BLANK_AUDIO\]?\s*$/i,"").trim();
-    if(!text){ el && el.remove(); pump(); return; }
+    const text = (payload.text||"").replace(/\[.*?\]|\(.*?\)|♪/g,"").trim();
+    if(!text || isJunk(text)){ el && el.remove(); pump(); return; }
     if(el){ el.querySelector(".en").textContent = text;
             el.querySelector(".es").textContent = "translating…"; }
     $("#t-asr").innerHTML = `${payload.ms.toFixed(0)}<small> ms</small>`;
@@ -478,12 +502,12 @@ function render(){
  * then transcribe -> translate -> speak each clause as it lands.
  */
 const SILENCE_MS = 420;   // pause that ends a clause
-const MIN_SPEECH_MS = 280; // ignore coughs and clicks
+const MIN_SPEECH_MS = 420; // ignore coughs, clicks and breaths
 const MAX_SEG_MS = 5000;  // force a cut if someone never pauses
 const RATE = 16000;       // whisper's sample rate; AudioContext resamples for us
 
 let actx=null, node=null, micStream=null, listening=false;
-let asrReady=false, asrLoading=false;
+let asrReady=false, asrLoading=false, asrSize="tiny";
 let buf=[], bufLen=0, speechLen=0, silenceLen=0, inSpeech=false;
 let frames=0, peak=0, health=null, floor_=0.006;
 const queue=[]; let busy=false, segNo=0;
@@ -500,8 +524,8 @@ async function startListening(){
   if(!asrReady){
     if(asrLoading) return;
     asrLoading = true;
-    status("downloading the speech model (~40 MB, once)…");
-    worker.postMessage({ type:"loadAsr" });
+    status(`downloading the speech model (~${asrSize==="base"?"80":"40"} MB, once)…`);
+    worker.postMessage({ type:"loadAsr", payload:{ size: asrSize } });
     return;
   }
 
@@ -643,13 +667,26 @@ $("#say").onclick = () => {
                  : [...document.querySelectorAll(".seg .es")].map(e=>e.textContent).join(" ");
   speechSynthesis.cancel(); say(t);
 };
+document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
+  if(asrLoading) return;
+  document.querySelectorAll("#asrsize button")
+    .forEach(x => x.setAttribute("aria-pressed", x === b));
+  if(b.dataset.v !== asrSize){
+    asrSize = b.dataset.v;
+    if(listening) stopListening();
+    asrReady = false;               // a different model has to be fetched
+    status(asrSize === "base"
+      ? "set to the larger model — press Start listening to fetch it (~80 MB)"
+      : "set to the small model — press Start listening");
+  }
+});
 $("#mic").onclick = () => listening ? stopListening() : startListening();
 
 /* ---- typed-text path (unchanged) ---- */
 let seq = 0, timer = null;
 const pending = new Map();
 function run(){
-  if(!ready) return;
+  if(!ready || listening) return;   // never overwrite live streaming output
   const text = src.value.trim();
   if(!text){ last=null; out.innerHTML='<span class="ph">Translation appears here.</span>';
     chg.innerHTML='<span class="none">Nothing yet.</span>'; return; }
@@ -659,7 +696,11 @@ function run(){
   out.classList.add("busy");
   worker.postMessage({ type:"translate", payload:{ id, lines, fast:false } });
 }
-src.addEventListener("input", () => { clearTimeout(timer); timer=setTimeout(run, 500); });
+src.addEventListener("input", () => {
+  clearTimeout(timer);
+  if(listening) return;             // typing is ignored while the mic is open
+  timer = setTimeout(run, 500);
+});
 document.querySelectorAll("#ex .chip").forEach(c => c.onclick = () => {
   if(listening) stopListening();
   src.value=EX[c.dataset.k]; run(); });
