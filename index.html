@@ -272,7 +272,9 @@ self.onmessage = async (e) => {
   }
   if (type === "loadAsr") {
     try {
-      asr = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
+      asr = await pipeline("automatic-speech-recognition",
+        payload && payload.size === "base" ? "Xenova/whisper-base.en"
+                                           : "Xenova/whisper-tiny.en", {
         dtype: "q8",
         progress_callback: (p) => self.postMessage({ type:"progress", payload:p }),
       });
@@ -675,6 +677,7 @@ document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
     asrSize = b.dataset.v;
     if(listening) stopListening();
     asrReady = false;               // a different model has to be fetched
+    asrLoading = false;
     status(asrSize === "base"
       ? "set to the larger model — press Start listening to fetch it (~80 MB)"
       : "set to the small model — press Start listening");
