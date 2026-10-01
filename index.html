@@ -324,9 +324,16 @@ function handle({type, payload}){
       let l=0, t=0;
       for(const v of seen.values()){ l+=v.loaded; t+=v.total; }
       const pc = t ? Math.min(100, Math.round(l/t*100)) : 0;
-      $("#bar").style.display="block";
-      $("#barfill").style.width = pc+"%";
-      $("#pct").textContent = `${pc}% — ${(l/1e6).toFixed(0)} of ${(t/1e6).toFixed(0)} MB`;
+      const txt = `${pc}% — ${(l/1e6).toFixed(0)} of ${(t/1e6).toFixed(0)} MB`;
+      if(gate.style.display === "none"){
+        // the gate is hidden, so this is the speech model: report it where the
+        // user is actually looking
+        status("downloading the speech model… " + txt);
+      } else {
+        $("#bar").style.display="block";
+        $("#barfill").style.width = pc+"%";
+        $("#pct").textContent = txt;
+      }
       $("#files").textContent = [...seen.keys()].map(f=>f.split("/").pop()).join(" · ");
     } else if(payload.status === "done" && payload.file){
       $("#files").textContent = [...seen.keys()].map(f=>f.split("/").pop()).join(" · ");
@@ -478,6 +485,7 @@ const RATE = 16000;       // whisper's sample rate; AudioContext resamples for u
 let actx=null, node=null, micStream=null, listening=false;
 let asrReady=false, asrLoading=false;
 let buf=[], bufLen=0, speechLen=0, silenceLen=0, inSpeech=false;
+let frames=0, peak=0, health=null, floor_=0.006;
 const queue=[]; let busy=false, segNo=0;
 
 const WORKLET = `class Cap extends AudioWorkletProcessor{
@@ -492,33 +500,68 @@ async function startListening(){
   if(!asrReady){
     if(asrLoading) return;
     asrLoading = true;
-    status("loading the speech model (~40 MB, once)…");
+    status("downloading the speech model (~40 MB, once)…");
     worker.postMessage({ type:"loadAsr" });
     return;
   }
+
+  // 1. microphone permission
+  status("requesting microphone…");
   try{
     micStream = await navigator.mediaDevices.getUserMedia({ audio:{
       channelCount:1, echoCancellation:true, noiseSuppression:true, autoGainControl:true }});
-  }catch(err){ status("microphone blocked: "+(err.message||err)); return; }
+  }catch(err){
+    const n = err && err.name || "";
+    status(n === "NotAllowedError" ? "microphone permission denied — allow it in the address bar, then press again"
+         : n === "NotFoundError"  ? "no microphone found"
+         : "microphone unavailable: " + n + " " + (err && err.message || err));
+    return;
+  }
 
-  actx = new (window.AudioContext||window.webkitAudioContext)({ sampleRate: RATE });
-  await actx.audioWorklet.addModule(URL.createObjectURL(
-    new Blob([WORKLET], {type:"text/javascript"})));
-  node = new AudioWorkletNode(actx, "cap");
-  node.port.onmessage = (e) => onAudio(e.data);
-  actx.createMediaStreamSource(micStream).connect(node);
-  node.connect(actx.destination);   // keeps the graph alive; worklet emits no audio
+  // 2. audio context. Created after an await, so the user gesture is gone and
+  //    the browser may hand it back suspended — it must be resumed explicitly
+  //    or no audio ever reaches the worklet.
+  try{
+    actx = new (window.AudioContext||window.webkitAudioContext)({ sampleRate: RATE });
+    if(actx.state === "suspended") await actx.resume();
+  }catch(err){ status("audio context failed: "+(err.message||err)); return; }
 
-  listening = true; resetSeg();
+  // 3. capture node, with a fallback for browsers that reject the worklet
+  const src_ = actx.createMediaStreamSource(micStream);
+  let mode = "worklet";
+  try{
+    await actx.audioWorklet.addModule(URL.createObjectURL(
+      new Blob([WORKLET], {type:"text/javascript"})));
+    node = new AudioWorkletNode(actx, "cap");
+    node.port.onmessage = (e) => onAudio(e.data);
+  }catch(err){
+    mode = "fallback";
+    node = actx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = (e) => onAudio(new Float32Array(e.inputBuffer.getChannelData(0)));
+  }
+  src_.connect(node);
+  // a muted sink keeps the graph pulling without echoing the speaker back
+  const sink = actx.createGain(); sink.gain.value = 0;
+  node.connect(sink); sink.connect(actx.destination);
+
+  listening = true; resetSeg(); frames = 0; peak = 0;
   $("#mic").classList.add("rec");
   $("#micdot").className = "dot";
   $("#miclabel").textContent = "Stop";
-  status("listening — speak naturally, it cuts on your pauses");
   out.innerHTML = "";
+  status(`listening (${actx.sampleRate} Hz, ${mode}) — speak, it cuts on your pauses`);
+  clearInterval(health);
+  health = setInterval(() => {
+    if(!listening) return;
+    if(frames === 0) status("microphone open but no audio arriving — check the input device");
+    else if(peak < 0.004) status(`listening — very quiet (peak ${peak.toFixed(3)}); speak up or pick another input`);
+    peak = 0;
+  }, 2500);
 }
 
 function stopListening(){
   listening = false;
+  clearInterval(health);
   try{ node && node.disconnect(); }catch(e){}
   try{ micStream && micStream.getTracks().forEach(t=>t.stop()); }catch(e){}
   try{ actx && actx.close(); }catch(e){}
@@ -537,8 +580,13 @@ function onAudio(frame){
   const rms = Math.sqrt(sum/frame.length);
   $("#meterfill").style.width = Math.min(100, rms*450).toFixed(0)+"%";
 
+  frames++; if(rms > peak) peak = rms;
+  // adapt to the room: track a slow noise floor and trigger above it
+  if(!inSpeech) floor_ = floor_*0.995 + rms*0.005;
+  const thresh = Math.max(0.006, floor_*2.5);
+
   const ms = frame.length/RATE*1000;
-  const voiced = rms > 0.012;
+  const voiced = rms > thresh;
   if(voiced){ inSpeech = true; speechLen += ms; silenceLen = 0; }
   else if(inSpeech) silenceLen += ms;
 
