@@ -744,7 +744,8 @@ if("serviceWorker" in navigator){
     .catch(() => offline("service worker unavailable — offline use will not work"));
   navigator.serviceWorker.addEventListener("message", async (e) => {
     if(e.data && e.data.type === "cacheStatus"){
-      const mb = (e.data.bytes/1e6).toFixed(0);
+      let mb = (e.data.bytes/1e6).toFixed(0);
+      try{ mb = ((await navigator.storage.estimate()).usage/1e6).toFixed(0); }catch{}
       const hosts = Object.keys(e.data.hosts || {});
       const hasLib = hosts.some(h => /jsdelivr|unpkg/.test(h));
       // check the actual weight files rather than trusting a count
