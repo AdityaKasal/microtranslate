@@ -429,16 +429,33 @@ $("#load").onclick = () => {
   worker.postMessage({ type:"load" });
 };
 try{
+  // nothing large is fetched until the service worker can see the request
+  async function swControlling(ms = 8000){
+    if(!("serviceWorker" in navigator)) return false;
+    if(navigator.serviceWorker.controller) return true;
+    try{ await navigator.serviceWorker.register("./sw.js"); }catch{ return false; }
+    const t0 = Date.now();
+    while(!navigator.serviceWorker.controller && Date.now()-t0 < ms){
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return !!navigator.serviceWorker.controller;
+  }
+
   const seen = localStorage.getItem("mt-cached");
   // Data Saver is an explicit request not to pull hundreds of MB unasked.
   const thrifty = (navigator.connection || {}).saveData === true;
   if(seen){
     $("#g-body").textContent = "The model is already cached in this browser. Loading it back now — no download needed.";
     $("#g-fine").textContent = "";
-    $("#load").click();
+    swControlling().then(() => $("#load").click());
   } else if(!thrifty){
-    $("#g-fine").textContent = "Downloading now so this works offline later. First load takes a minute.";
-    $("#load").click();
+    $("#g-fine").textContent = "Getting ready to store this for offline use…";
+    swControlling().then((ok) => {
+      $("#g-fine").textContent = ok
+        ? "Downloading now so this works offline later. First load takes a minute."
+        : "Downloading the model. This happens once.";
+      $("#load").click();
+    });
   }
 }catch(e){}
 
