@@ -5,7 +5,7 @@
 // Chrome showed its offline page instead. Everything the app needs now goes
 // through here: the shell, the library from the CDN, the ONNX runtime WASM,
 // and the model weights.
-const CACHE = "microtranslate-v4";
+const CACHE = "microtranslate-v5";
 const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
 const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
                "./manifest.webmanifest", "./icon.svg",
@@ -14,10 +14,10 @@ const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
                // without it nothing runs, so fetch it up front.
                LIB];
 
-// The library and the ONNX runtime WASM. Model weights are deliberately NOT
-// here: Transformers.js already caches those itself, and duplicating 370MB in
-// a second store helps nobody.
-const KEEP = /(^|\.)jsdelivr\.net$|(^|\.)unpkg\.com$/;
+// The library, the ONNX runtime WASM, and the model weights. Transformers.js
+// has its own store, but it cached the speech model and not the translation
+// model, so weights now go here where they can actually be verified.
+const KEEP = /(^|\.)jsdelivr\.net$|(^|\.)unpkg\.com$|(^|\.)huggingface\.co$|(^|\.)hf\.co$/;
 
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
@@ -34,6 +34,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
     const names = await caches.keys();
+    // also drops the library's old store, now redundant
     await Promise.all(names.filter((n) => n !== CACHE).map((n) => caches.delete(n)));
     await self.clients.claim();
   })());

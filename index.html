@@ -695,10 +695,15 @@ if("serviceWorker" in navigator){
   navigator.serviceWorker.addEventListener("message", async (e) => {
     if(e.data && e.data.type === "cacheStatus"){
       const mb = (e.data.bytes/1e6).toFixed(0);
-      const hasLib = Object.keys(e.data.hosts||{}).some(h => /jsdelivr|unpkg/.test(h));
-      const models = await caches.has("transformers-cache")
-        ? (await (await caches.open("transformers-cache")).keys()).length : 0;
-      offline(hasLib && models >= 2 && ready && asrReady
+      const hosts = Object.keys(e.data.hosts || {});
+      const hasLib = hosts.some(h => /jsdelivr|unpkg/.test(h));
+      // check the actual weight files rather than trusting a count
+      const weights = [
+        "https://huggingface.co/Xenova/opus-mt-en-es/resolve/main/onnx/encoder_model_quantized.onnx",
+        "https://huggingface.co/Xenova/opus-mt-en-es/resolve/main/onnx/decoder_model_merged_quantized.onnx"];
+      let haveWeights = true;
+      for(const u of weights) if(!(await caches.match(u))) haveWeights = false;
+      offline(hasLib && haveWeights && ready && asrReady
         ? `ready to work offline \u2014 ${mb} MB stored, you can disconnect`
         : `not ready yet (${mb} MB stored) \u2014 press "prepare offline"`);
     }

@@ -4,6 +4,9 @@
 // and the app could not work offline.
 import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
 env.allowLocalModels = false;
+// The service worker is the single cache for weights: its contents can be
+// inspected and verified, unlike the library's own store.
+env.useBrowserCache = false;
 let pipe = null, asr = null, asrName = "";
 self.onmessage = async (e) => {
   const { type, payload } = e.data;
