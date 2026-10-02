@@ -5,9 +5,14 @@
 // Chrome showed its offline page instead. Everything the app needs now goes
 // through here: the shell, the library from the CDN, the ONNX runtime WASM,
 // and the model weights.
-const CACHE = "microtranslate-v2";
+const CACHE = "microtranslate-v3";
+const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
 const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
-               "./manifest.webmanifest", "./icon.svg"];
+               "./manifest.webmanifest", "./icon.svg",
+               // The worker imports this at its top level. Verifying offline
+               // showed it was not ending up in the cache on its own, and
+               // without it nothing runs, so fetch it up front.
+               LIB];
 
 // The library and the ONNX runtime WASM. Model weights are deliberately NOT
 // here: Transformers.js already caches those itself, and duplicating 370MB in

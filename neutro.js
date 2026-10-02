@@ -50,7 +50,14 @@ DET_F2M["de la"]="del"; DET_F2M["a la"]="al";
 
 const NOT_ADJ = new Set(("de del la el los las que y o en con por para a al no se lo su sus "+
   "mi mis tu tus como pero si cuando donde desde hasta sobre entre sin tras ya muy "+
-  "más menos todo todos esto eso").split(" "));
+  "más menos todo todos esto eso "+
+  // Adverbs and other invariables ending in -o/-a/-os/-as. These look exactly
+  // like an agreeing adjective to the repair pass, which is how "gafas cerca"
+  // came out as "lentes cerco".
+  "cerca lejos ahora nunca siempre fuera dentro adentro afuera arriba abajo "+
+  "encima debajo delante detrás despacio luego tampoco mientras apenas nada "+
+  "algo cada acaso quizá entonces además así aun aún pues sino hoy ayer mañana "+
+  "temprano aquí allí ahí acá allá casi jamás antes después").split(" "));
 const COPULA = "(?:es|era|está|estaba|fue|será|sería|parece|parecía|resulta|son|eran|"+
   "están|estaban|fueron|serán|parecen|quedó|quedaron)";
 
