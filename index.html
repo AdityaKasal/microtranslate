@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>microtranslate</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#141210">
+  <link rel="icon" href="./icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -137,6 +140,14 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
     border-radius:999px;padding:.34rem .8rem;font:inherit;font-size:.82rem;
     min-width:16rem;outline:none}
   .names:focus{border-color:var(--accent)}
+  .offline-bar{max-width:var(--w);margin:1.1rem auto 0;padding:0 1.2rem;
+    display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}
+  .prep{background:var(--card);border:1px solid var(--line);color:var(--ink);
+    border-radius:999px;padding:.4rem 1rem;font:inherit;font-size:.82rem;
+    cursor:pointer;white-space:nowrap}
+  .prep:hover:not(:disabled){border-color:var(--accent)}
+  .prep:disabled{opacity:.5;cursor:default}
+  .offline{font-size:.8rem;color:var(--dim);font-family:var(--mono)}
 </style>
 </head>
 <body>
@@ -167,8 +178,9 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
       <div class="grp">
         <label class="lbl">hearing</label>
         <div class="seg" id="asrsize">
-          <button data-v="best" aria-pressed="true">accurate</button>
           <button data-v="fast" aria-pressed="false">fast</button>
+          <button data-v="best" aria-pressed="true">accurate</button>
+          <button data-v="max"  aria-pressed="false">max</button>
         </div>
       </div>
       <div class="grp">
@@ -223,6 +235,11 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
       <div class="cell"><div class="k">BLEU <small>flores</small></div><div class="v">26.38</div></div>
       <div class="cell"><div class="k">runs on</div><div class="v" id="t-dev">wasm</div></div>
     </div>
+  </div>
+
+  <div class="offline-bar">
+    <button id="prep" class="prep">prepare offline</button>
+    <span id="offline" class="offline">checking what is stored…</span>
   </div>
 
   <footer id="foot">
@@ -285,8 +302,10 @@ self.onmessage = async (e) => {
   }
   if (type === "loadAsr") {
     try {
-      asrName = payload && payload.size === "fast" ? "Xenova/whisper-base.en"
-                                                   : "Xenova/whisper-small.en";
+      asrName = { fast:  "Xenova/whisper-base.en",
+                  best:  "Xenova/whisper-small.en",
+                  max:   "Xenova/whisper-medium.en"
+                }[(payload && payload.size) || "best"] || "Xenova/whisper-small.en";
       asr = await pipeline("automatic-speech-recognition", asrName, {
         dtype: "q8",
         progress_callback: (p) => self.postMessage({ type:"progress", payload:p }),
@@ -302,7 +321,7 @@ self.onmessage = async (e) => {
       const t0 = performance.now();
       const r = await asr(payload.audio, {
         chunk_length_s: 30, stride_length_s: 5,
-        num_beams: asrName.includes("small") ? 4 : 2,   // beams buy accuracy
+        num_beams: asrName.includes("base") ? 2 : 4,   // beams buy accuracy
         condition_on_previous_text: false });
       self.postMessage({ type:"transcript",
         payload:{ id: payload.id, text:(r.text||"").trim(), ms: performance.now()-t0 } });
@@ -535,6 +554,7 @@ const RATE = 16000;       // whisper's sample rate; AudioContext resamples for u
 
 let actx=null, node=null, micStream=null, listening=false;
 let asrReady=false, asrLoading=false, asrSize="best";
+const MB = { fast:80, best:250, max:780 };
 let buf=[], bufLen=0, speechLen=0, silenceLen=0, inSpeech=false;
 let frames=0, peak=0, health=null, floor_=0.006;
 const queue=[]; let busy=false, segNo=0;
@@ -551,7 +571,7 @@ async function startListening(){
   if(!asrReady){
     if(asrLoading) return;
     asrLoading = true;
-    status(`downloading the speech model (~${asrSize==="fast"?"80":"250"} MB, once)…`);
+    status(`downloading the speech model (~${MB[asrSize]} MB, once)…`);
     worker.postMessage({ type:"loadAsr", payload:{ size: asrSize } });
     return;
   }
@@ -703,11 +723,72 @@ document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
     if(listening) stopListening();
     asrReady = false;               // a different model has to be fetched
     asrLoading = false;
-    status(asrSize === "best"
-      ? "set to the accurate model — press Start listening (~250 MB)"
-      : "set to the fast model — press Start listening (~80 MB)");
+    status(`set to the ${asrSize} speech model — press Start listening (~${MB[asrSize]} MB)`);
   }
 });
+// ---- offline ------------------------------------------------------------
+let swReg = null;
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./sw.js").then(r => { swReg = r; askCache(); })
+    .catch(() => offline("service worker unavailable — offline use will not work"));
+  navigator.serviceWorker.addEventListener("message", async (e) => {
+    if(e.data && e.data.type === "cacheStatus"){
+      const mb = (e.data.bytes/1e6).toFixed(0);
+      const hasLib = Object.keys(e.data.hosts||{}).some(h => /jsdelivr|unpkg/.test(h));
+      const models = await caches.has("transformers-cache")
+        ? (await (await caches.open("transformers-cache")).keys()).length : 0;
+      offline(hasLib && models >= 2 && ready && asrReady
+        ? `ready to work offline \u2014 ${mb} MB stored, you can disconnect`
+        : `not ready yet (${mb} MB stored) \u2014 press "prepare offline"`);
+    }
+  });
+} else {
+  offline("this browser cannot store the app for offline use");
+}
+function offline(msg){ const el = $("#offline"); if(el) el.textContent = msg; }
+function askCache(){
+  const c = navigator.serviceWorker.controller;
+  if(c) c.postMessage({ type:"cacheStatus" });
+  else setTimeout(askCache, 1200);
+}
+
+// Fetch everything needed so there is a clear point where it is safe to
+// disconnect, instead of discovering a missing file with no network.
+async function prepareOffline(){
+  const btn = $("#prep");
+  btn.disabled = true;
+  try{
+    if(!ready){
+      offline("downloading the translation model\u2026");
+      if(!worker) $("#load").click();
+      await new Promise((res, rej) => {
+        const t0 = Date.now();
+        (function wait(){
+          if(ready) return res();
+          if(Date.now()-t0 > 600000) return rej(new Error("timed out"));
+          setTimeout(wait, 400);
+        })();
+      });
+    }
+    if(!asrReady){
+      offline(`downloading the speech model (~${MB[asrSize]} MB)\u2026`);
+      await new Promise((res, rej) => {
+        const done = (e) => { if(e.data && e.data.type === "asrReady"){
+          worker.removeEventListener("message", done); res(); } };
+        worker.addEventListener("message", done);
+        asrLoading = true;
+        worker.postMessage({ type:"loadAsr", payload:{ size: asrSize } });
+        setTimeout(() => rej(new Error("timed out")), 600000);
+      });
+    }
+    offline("checking what is stored\u2026");
+    setTimeout(askCache, 1500);
+  }catch(err){
+    offline("could not finish: " + (err.message || err));
+  }finally{ btn.disabled = false; }
+}
+$("#prep").onclick = prepareOffline;
+
 const namesEl = $("#names");
 if(namesEl){
   namesEl.value = NAMES.join(", ");

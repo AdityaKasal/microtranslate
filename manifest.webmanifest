@@ -1,0 +1,13 @@
+{
+  "name": "microtranslate",
+  "short_name": "microtranslate",
+  "description": "English to neutral Latin American Spanish, entirely on your device.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#141210",
+  "theme_color": "#141210",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
