@@ -5,7 +5,7 @@
 // Chrome showed its offline page instead. Everything the app needs now goes
 // through here: the shell, the library from the CDN, the ONNX runtime WASM,
 // and the model weights.
-const CACHE = "microtranslate-v3";
+const CACHE = "microtranslate-v4";
 const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
 const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
                "./manifest.webmanifest", "./icon.svg",
@@ -22,8 +22,11 @@ const KEEP = /(^|\.)jsdelivr\.net$|(^|\.)unpkg\.com$/;
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    // addAll fails the whole install if any single file 404s, so do them singly
-    await Promise.all(SHELL.map((u) => c.add(u).catch(() => {})));
+    // cache:"reload" bypasses the HTTP cache. Without it, install stores
+    // whatever stale copy the browser already had, which is how a fixed
+    // neutro.js shipped but never reached the page.
+    await Promise.all(SHELL.map((u) =>
+      c.add(new Request(u, { cache: "reload" })).catch(() => {})));
     await self.skipWaiting();
   })());
 });
@@ -60,7 +63,10 @@ self.addEventListener("fetch", (e) => {
     // version they first loaded, with no way to ever ship them a fix, so go to
     // the network first and keep the cache only as the offline fallback.
     try {
-      const res = await fetch(req);
+      // revalidate rather than trusting the HTTP cache, for the same reason
+      let res;
+      try { res = await fetch(req.url, { cache: "no-cache" }); }
+      catch { res = await fetch(req); }
       if (res && res.status === 200) cache.put(req, res.clone()).catch(() => {});
       return res;
     } catch (err) {
