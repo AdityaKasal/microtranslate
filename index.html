@@ -399,6 +399,14 @@ function handle({type, payload}){
     busy = false;
     const el = document.getElementById("seg"+payload.id);
     let text = (payload.text||"").replace(/\[.*?\]|\(.*?\)|♪/g,"").trim();
+    if(payload.audioMs){
+      const r = payload.ms / payload.audioMs;
+      rtf = rtf ? rtf*0.7 + r*0.3 : r;
+      if(rtf > 0.85 && beams > 1) beams = 1;
+      if(rtf > 1.6 && asrSize !== "fast"){
+        status(`falling behind (${rtf.toFixed(1)}x slower than speech) — try the "fast" model`);
+      }
+    }
     text = repairNames(text);
     if(!text || isJunk(text)){ el && el.remove(); pump(); return; }
     if(el){ el.querySelector(".en").textContent = text;
@@ -509,9 +517,9 @@ function render(){
  * button, cut the audio at natural pauses (energy-based voice activity),
  * then transcribe -> translate -> speak each clause as it lands.
  */
-const SILENCE_MS = 750;   // a real clause boundary, not a mid-phrase breath
+const SILENCE_MS = 620;   // a real clause boundary, not a mid-phrase breath
 const MIN_SPEECH_MS = 500; // ignore coughs, clicks and breaths
-const MAX_SEG_MS = 9000;  // force a cut if someone never pauses
+const MAX_SEG_MS = 5500;  // bounds how long you wait to see a clause
 const RATE = 16000;       // whisper's sample rate; AudioContext resamples for us
 
 let actx=null, node=null, micStream=null, listening=false;
@@ -645,8 +653,17 @@ function enqueue(audio){
   queue.push({ id, audio, t0: performance.now() });
   pump();
 }
+let beams = 1, rtf = 0;            // real-time factor: >1 means we are falling behind
 function pump(){
   if(busy || !queue.length) return;
+  // A backlog means we are slower than speech. Drop the oldest rather than let
+  // every later clause inherit the delay.
+  while(queue.length > 3){
+    const old = queue.shift();
+    jobs.delete(old.id);
+    const el = document.getElementById("seg-"+old.id);
+    el && el.remove();
+  }
   busy = true;
   const job = queue.shift();
   jobs.set(job.id, job);

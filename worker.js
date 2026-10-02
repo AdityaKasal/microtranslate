@@ -43,10 +43,12 @@ self.onmessage = async (e) => {
       const t0 = performance.now();
       const r = await asr(payload.audio, {
         chunk_length_s: 30, stride_length_s: 5,
-        num_beams: asrName.includes("base") ? 2 : 4,   // beams buy accuracy
+        num_beams: (payload && payload.beams) || 1,   // beams cost 3-4x decode time
         condition_on_previous_text: false });
       self.postMessage({ type:"transcript",
-        payload:{ id: payload.id, text:(r.text||"").trim(), ms: performance.now()-t0 } });
+        payload:{ id: payload.id, text:(r.text||"").trim(),
+                  ms: performance.now()-t0,
+                  audioMs: (payload.audio.length/16000)*1000 } });
     } catch (err) {
       self.postMessage({ type:"asrError", payload:String(err && err.message || err) });
     }
