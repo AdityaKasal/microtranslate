@@ -1,0 +1,20 @@
+[package]
+name = "microtranslate"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+# the lib target is what the iOS and Android builds link against, so the app
+# entry point lives here rather than in main.rs
+name = "microtranslate_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

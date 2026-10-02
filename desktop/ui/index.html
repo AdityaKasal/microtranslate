@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>microtranslate</title>
+  <meta name="theme-color" content="#141210">
+  <link rel="icon" href="./icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="microtranslate">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#faf8f5; --panel:#fffefc; --ink:#1a1714; --ink-2:#514940; --ink-3:#8b7f73;
+  --rule:#e5ded4; --rule-2:#d6ccbe; --mark-bg:#fdf0d5; --mark-line:#c8912f;
+  --mark-ink:#6b4a0f; --accent:#8a4b2a; --ok:#3f6b4a;
+  --ui:"Inter",system-ui,sans-serif; --serif:"Newsreader",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+:root:not([data-theme="light"]){ @media (prefers-color-scheme:dark){
+  --paper:#15130f; --panel:#1d1a16; --ink:#f2ece3; --ink-2:#bdb3a5; --ink-3:#8a8073;
+  --rule:#2e2a24; --rule-2:#3d382f; --mark-bg:#3a2e14; --mark-line:#d9a845;
+  --mark-ink:#f5dba2; --accent:#d98b63; --ok:#7fb08c;
+}}
+:root[data-theme="dark"]{
+  --paper:#15130f; --panel:#1d1a16; --ink:#f2ece3; --ink-2:#bdb3a5; --ink-3:#8a8073;
+  --rule:#2e2a24; --rule-2:#3d382f; --mark-bg:#3a2e14; --mark-line:#d9a845;
+  --mark-ink:#f5dba2; --accent:#d98b63; --ok:#7fb08c;
+}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--ui);
+  -webkit-font-smoothing:antialiased;line-height:1.5}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px 64px}
+header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+  padding:28px 0 18px;border-bottom:1px solid var(--rule)}
+h1{font-family:var(--serif);font-weight:400;font-size:27px;letter-spacing:-.015em;margin:0}
+h1 em{font-style:italic;color:var(--accent)}
+.tag{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em;
+  text-transform:uppercase}
+.spacer{flex:1}
+.theme{background:none;border:1px solid var(--rule-2);color:var(--ink-2);
+  border-radius:999px;width:30px;height:30px;cursor:pointer;font-size:13px;
+  display:grid;place-items:center}
+.theme:hover{border-color:var(--ink-3);color:var(--ink)}
+
+/* gate */
+.gate{margin-top:28px;border:1px solid var(--rule);border-radius:14px;
+  background:var(--panel);padding:30px 28px;text-align:center}
+.gate h2{font-family:var(--serif);font-weight:400;font-size:23px;margin:0 0 8px}
+.gate p{color:var(--ink-2);font-size:14.5px;max-width:56ch;margin:0 auto 6px;line-height:1.65}
+.gate p.fine{font-size:13px;color:var(--ink-3)}
+.btn{margin-top:18px;font-family:var(--ui);font-size:14px;font-weight:500;
+  padding:11px 22px;border-radius:9px;border:1px solid var(--ink);
+  background:var(--ink);color:var(--paper);cursor:pointer}
+.btn:hover{opacity:.88} .btn:disabled{opacity:.5;cursor:default}
+.bar{height:5px;background:var(--rule);border-radius:99px;overflow:hidden;
+  margin:20px auto 10px;max-width:430px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);
+  transition:width .25s ease}
+.pct{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.files{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:8px;
+  line-height:1.8}
+
+/* app */
+.app{display:none}
+.app.on{display:block}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 0;
+  border-bottom:1px solid var(--rule)}
+.grp{display:flex;align-items:center;gap:8px}
+label.lbl{font-size:11px;color:var(--ink-3);font-family:var(--mono);
+  letter-spacing:.04em;text-transform:uppercase}
+.examples{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--rule-2);background:var(--panel);color:var(--ink-2)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);
+  border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-top:20px}
+.pane{background:var(--panel);padding:16px 18px 18px;min-height:280px;
+  display:flex;flex-direction:column}
+.pane h2{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 12px}
+textarea{flex:1;width:100%;border:0;outline:0;resize:none;background:transparent;
+  color:var(--ink);font-family:var(--serif);font-size:19px;line-height:1.6}
+textarea::placeholder{color:var(--ink-3);font-style:italic}
+.out{flex:1;font-family:var(--serif);font-size:19px;line-height:1.6;white-space:pre-wrap}
+.out .ln{margin:0 0 10px} .out .ln:last-child{margin:0}
+.ph{color:var(--ink-3);font-style:italic}
+mark{background:var(--mark-bg);color:var(--mark-ink);
+  border-bottom:1.5px solid var(--mark-line);border-radius:2px;padding:0 1px;cursor:help}
+.toggle{text-transform:none;letter-spacing:0;cursor:pointer;color:var(--accent);
+  font-weight:500}
+.changes{margin-top:18px;border:1px solid var(--rule);border-radius:12px;
+  background:var(--panel);padding:14px 18px}
+.changes h3{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 10px}
+.chg{display:flex;flex-wrap:wrap;gap:8px}
+.pair{font-family:var(--mono);font-size:12.5px;border:1px solid var(--rule-2);
+  border-radius:7px;padding:5px 10px;background:var(--paper)}
+.pair s{color:var(--ink-3)} .pair b{color:var(--mark-ink);font-weight:500}
+:root[data-theme="dark"] .pair b,
+:root:not([data-theme="light"]) .pair b{color:var(--mark-line)}
+.none{font-size:13px;color:var(--ink-3);font-style:italic;font-family:var(--serif)}
+.tele{display:flex;flex-wrap:wrap;margin-top:18px;border:1px solid var(--rule);
+  border-radius:12px;overflow:hidden;background:var(--panel)}
+.cell{flex:1 1 120px;padding:12px 16px;border-right:1px solid var(--rule)}
+.cell:last-child{border-right:0}
+.cell .k{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3)}
+.cell .v{font-family:var(--mono);font-size:17px;margin-top:3px;color:var(--ink)}
+.cell .v small{font-size:11px;color:var(--ink-3)}
+footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
+.busy{opacity:.45;transition:opacity .15s}
+.paneh{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.paneh h2{margin:0;flex:1}
+.iconbtn{display:inline-flex;align-items:center;gap:6px;font-family:var(--ui);
+  font-size:12px;font-weight:500;padding:5px 11px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--rule-2);background:var(--paper);color:var(--ink-2)}
+.iconbtn:hover{border-color:var(--accent);color:var(--accent)}
+.iconbtn:disabled{opacity:.45;cursor:default}
+.iconbtn.rec{background:#b4452c;border-color:#b4452c;color:#fff}
+.iconbtn.rec .dot{width:7px;height:7px;border-radius:99px;background:#fff;
+  animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.mic-status{font-family:var(--mono);font-size:11px;color:var(--ink-3);
+  margin-top:8px;min-height:14px}
+.meter{height:3px;background:var(--rule);border-radius:99px;overflow:hidden;margin-top:6px}
+.meter i{display:block;height:100%;width:0;background:var(--ok);transition:width .08s linear}
+.seg{border-left:2px solid var(--rule-2);padding-left:10px;margin:0 0 12px}
+.seg.live{border-left-color:var(--accent)}
+.seg .en{font-size:13px;color:var(--ink-3);font-family:var(--ui);margin-bottom:2px}
+.seg .lat{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:3px}
+.sw{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);
+  cursor:pointer;user-select:none}
+.sw input{accent-color:var(--accent)}
+.err{color:#b4452c;font-size:13.5px;margin-top:12px;font-family:var(--mono)}
+@media(max-width:720px){.panes{grid-template-columns:1fr}.pane{min-height:190px}
+  h1{font-size:23px}.gate{padding:24px 18px}}
+  .names{background:var(--card);border:1px solid var(--line);color:var(--ink);
+    border-radius:999px;padding:.34rem .8rem;font:inherit;font-size:.82rem;
+    min-width:16rem;outline:none}
+  .names:focus{border-color:var(--accent)}
+  .offline-bar{max-width:var(--w);margin:1.1rem auto 0;padding:0 1.2rem;
+    display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}
+  .prep{background:var(--card);border:1px solid var(--line);color:var(--ink);
+    border-radius:999px;padding:.4rem 1rem;font:inherit;font-size:.82rem;
+    cursor:pointer;white-space:nowrap}
+  .prep:hover:not(:disabled){border-color:var(--accent)}
+  .prep:disabled{opacity:.5;cursor:default}
+  .offline{font-size:.8rem;color:var(--dim);font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>micro<em>translate</em></h1>
+    <span class="tag">en → español neutro · runs in your browser</span>
+    <span class="spacer"></span>
+    <button class="theme" id="theme" title="Toggle theme">◐</button>
+  </header>
+
+  <section class="gate" id="gate">
+    <h2 id="g-title">Runs entirely on your device</h2>
+    <p id="g-body">This page carries its own translation model — a 74M-parameter
+      OPUS-MT network quantized to int8. It downloads once (about 119&nbsp;MB),
+      is cached by your browser, and from then on works with no network and no
+      server. Nothing you type ever leaves this machine.</p>
+    <p class="fine" id="g-fine">First load takes a minute on a decent connection.</p>
+    <div class="bar" id="bar" style="display:none"><i id="barfill"></i></div>
+    <div class="pct" id="pct"></div>
+    <div class="files" id="files"></div>
+    <button class="btn" id="load">Load the model</button>
+    <div class="err" id="err"></div>
+  </section>
+
+  <div class="app" id="app">
+    <div class="controls">
+      <div class="grp">
+        <label class="lbl">hearing</label>
+        <div class="seg" id="asrsize">
+          <button data-v="fast" aria-pressed="true">fast</button>
+          <button data-v="best" aria-pressed="false">accurate</button>
+          <button data-v="max"  aria-pressed="false">max</button>
+        </div>
+      </div>
+      <div class="grp">
+        <label class="lbl">names</label>
+        <input id="names" class="names" spellcheck="false"
+               placeholder="Aditya Kasal, Guadalupe, ..." />
+      </div>
+      <div class="grp">
+        <label class="lbl">examples</label>
+        <div class="examples" id="ex">
+          <button class="chip" data-k="pen">peninsular vocabulary</button>
+          <button class="chip" data-k="vos">vosotros</button>
+          <button class="chip" data-k="serv">service</button>
+          <button class="chip" data-k="trap">false friends</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panes">
+      <div class="pane">
+        <div class="paneh">
+          <h2>English</h2>
+          <button class="iconbtn" id="mic"><span id="micdot"></span><span id="miclabel">Start listening</span></button>
+        </div>
+        <textarea id="src" spellcheck="false"
+          placeholder="Type English, or press Speak and talk…"></textarea>
+        <div class="mic-status" id="micstatus"></div>
+        <div class="meter" id="meter"><i id="meterfill"></i></div>
+      </div>
+      <div class="pane">
+        <div class="paneh">
+          <h2>Español neutro <span class="toggle" id="rawtog">· show raw</span></h2>
+          <button class="iconbtn" id="say">Play</button>
+        </div>
+        <div class="out" id="out"><span class="ph">Translation appears here.</span></div>
+        <div class="mic-status">
+          <label class="sw"><input type="checkbox" id="autosay"> speak automatically</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="changes">
+      <h3>What the register layer changed</h3>
+      <div class="chg" id="chg"><span class="none">Nothing yet.</span></div>
+    </div>
+
+    <div class="tele">
+      <div class="cell"><div class="k">end to end</div><div class="v" id="t-e2e">—</div></div>
+      <div class="cell"><div class="k">translate</div><div class="v" id="t-ms">—</div></div>
+      <div class="cell"><div class="k">transcribe</div><div class="v" id="t-asr">—</div></div>
+      <div class="cell"><div class="k">model</div><div class="v">119<small> MB int8</small></div></div>
+      <div class="cell"><div class="k">BLEU <small>flores</small></div><div class="v">26.38</div></div>
+      <div class="cell"><div class="k">runs on</div><div class="v" id="t-dev">wasm</div></div>
+    </div>
+  </div>
+
+  <footer id="foot">
+    OPUS-MT en→es exported to ONNX and quantized to int8, executed in-browser by
+    Transformers.js, plus a rewriting layer that forces output into
+    <em>español neutro</em>. Highlighted words are the layer's edits — hover to
+    see what the model originally produced.
+  </footer>
+</div>
+
+<script type="module">
+import { toNeutro } from "./neutro.js";
+
+const EX = {
+  pen:"I need to turn on the computer.\nWe parked the car on the street.\nPut the milk in the fridge and the potatoes on the table.\nThe plumber lost his glasses in the elevator.\nThe waiter brought a slice of cake and a bus ticket.",
+  vos:"Do you all have your tickets?\nCome here, all of you.\nWhere did you all park your cars?\nEat the cake and drink the juice.",
+  serv:"Good morning, and welcome to the service.\nListen, all of you. Come here and pray with me.\nTake your seats and open your books.",
+  trap:"France is the seventh country in the European Union.\nThey travelled back to Paris in a carriage.\nI am very thirsty after running.\nThat leads to better results.\nI need my driver's licence.\nA car bomb exploded downtown."
+};
+const $ = s => document.querySelector(s);
+const gate=$("#gate"), app=$("#app"), src=$("#src"), out=$("#out"), chg=$("#chg");
+let worker=null, ready=false, showRaw=false, last=null;
+// proper nouns the user wants protected; declared up here because the input
+// wiring runs before the helpers further down
+let NAMES = [];
+try { NAMES = JSON.parse(localStorage.getItem("mt.names") || "[]"); } catch {}
+
+/* theme */
+const sysDark = matchMedia("(prefers-color-scheme: dark)");
+let theme = "auto";
+try{ theme = localStorage.getItem("mt-theme") || "auto"; }catch(e){}
+const applyTheme = () => theme==="auto"
+  ? document.documentElement.removeAttribute("data-theme")
+  : document.documentElement.setAttribute("data-theme", theme);
+applyTheme();
+$("#theme").onclick = () => {
+  theme = theme==="auto" ? (sysDark.matches?"light":"dark") : theme==="dark"?"light":"dark";
+  try{ localStorage.setItem("mt-theme", theme); }catch(e){}
+  applyTheme();
+};
+
+/* the model runs in a worker so the page never freezes during inference */
+function startWorker(){
+  const w = new Worker("./worker.js", { type:"module" });
+  w.onmessage = (e) => handle(e.data);
+  w.onerror = (e) => fail(e.message || "worker failed to start");
+  return w;
+}
+
+const seen = new Map(), asrJobs = new Map(), nameMaps = new Map();
+// Small Whisper models emit stock phrases when handed a breath, a click or
+// near-silence. Drop them rather than translating noise.
+const JUNK = new Set(["oh","ah","uh","um","mm","hm","hmm","you","bye","so",
+  "thank you","thanks","thanks for watching","thanks for watching!","okay","ok",
+  "yeah","yes","no","the","a","and","bye bye","goodbye","please subscribe",
+  "subscribe","music","applause","silence","blank_audio"]);
+const isJunk = (t) => {
+  const k = t.toLowerCase().replace(/[^a-z\s']/g, "").trim();
+  return !k || k.length < 2 || JUNK.has(k);
+};
+// the quantized model occasionally emits a doubled sentence-final period
+const tidy = (t) => t.replace(/([.!?])\1+/g, "$1").replace(/\s+([.,;:!?])/g, "$1").trim();
+function markup(raw, neu){
+  const parts = segs(raw, neu);
+  return parts.map(p => p.changed
+    ? `<mark title="model produced: ${esc(p.was||"—")}">${esc(p.text)}</mark>`
+    : esc(p.text)).join(" ");
+}
+function handle({type, payload}){
+  if(type === "progress"){
+    if(payload.status === "progress" && payload.file && payload.total){
+      seen.set(payload.file, {loaded:payload.loaded, total:payload.total});
+      let l=0, t=0;
+      for(const v of seen.values()){ l+=v.loaded; t+=v.total; }
+      const pc = t ? Math.min(100, Math.round(l/t*100)) : 0;
+      const txt = `${pc}% — ${(l/1e6).toFixed(0)} of ${(t/1e6).toFixed(0)} MB`;
+      if(gate.style.display === "none"){
+        // the gate is hidden, so this is the speech model: report it where the
+        // user is actually looking
+        status("downloading the speech model… " + txt);
+      } else {
+        $("#bar").style.display="block";
+        $("#barfill").style.width = pc+"%";
+        $("#pct").textContent = txt;
+      }
+      $("#files").textContent = [...seen.keys()].map(f=>f.split("/").pop()).join(" · ");
+    } else if(payload.status === "done" && payload.file){
+      $("#files").textContent = [...seen.keys()].map(f=>f.split("/").pop()).join(" · ");
+    }
+  }
+  else if(type === "ready"){
+    ready = true;
+    $("#t-dev").textContent = payload.device || "wasm";
+    gate.style.display = "none";
+    app.classList.add("on");
+    try{ localStorage.setItem("mt-cached","1"); }catch(e){}
+    src.value = EX.pen; run();
+    loadSpeechModel();
+  }
+  else if(type === "result" && String(payload.id).startsWith("s")){
+    const sid = +String(payload.id).slice(1);
+    const job = asrJobs.get(sid); asrJobs.delete(sid);
+    const raw = payload.outs[0] || "";
+    const pm = (nameMaps.get(payload.id) || [[]])[0] || [];
+    raw = restore(raw, pm); nameMaps.delete(payload.id);
+    const neu = toNeutro(tidy(raw));
+    const el = document.getElementById("seg"+sid);
+    if(el){
+      el.classList.remove("live");
+      const e2e = performance.now() - (job ? job.t0 : performance.now());
+      el.querySelector(".es").className = "es";
+      el.querySelector(".es").innerHTML = markup(tidy(raw), neu);
+      const lat = document.createElement("div");
+      lat.className = "lat";
+      lat.textContent = `${(e2e/1000).toFixed(1)}s end to end · asr ${(job?job.asrMs:0).toFixed(0)}ms · mt ${payload.ms.toFixed(0)}ms`;
+      el.appendChild(lat);
+      $("#t-e2e").innerHTML = `${(e2e/1000).toFixed(1)}<small> s</small>`;
+      $("#t-ms").innerHTML = `${payload.ms.toFixed(0)}<small> ms</small>`;
+      out.scrollTop = out.scrollHeight;
+    }
+    const ps = segs(tidy(raw), neu).filter(x => x.changed && x.was)
+                 .map(x => [x.was, x.text]);
+    if(ps.length){
+      if(chg.querySelector(".none")) chg.innerHTML = "";
+      chg.insertAdjacentHTML("beforeend", ps.map(([a,b]) =>
+        `<span class="pair"><s>${esc(a)}</s> → <b>${esc(b)}</b></span>`).join(""));
+    }
+    if($("#autosay").checked) say(neu);
+    return;
+  }
+  else if(type === "result"){
+    const job = pending.get(payload.id);
+    pending.delete(payload.id);
+    if(!job || payload.id !== seq) return;
+    const pms = nameMaps.get(payload.id) || [];
+    payload.outs = payload.outs.map((o,i) => restore(o, pms[i] || []));
+    nameMaps.delete(payload.id);
+    const neu = payload.outs.map(o => toNeutro(tidy(o)));
+    last = { lines: payload.outs.map((raw,i) => ({ raw: tidy(raw), neutro: neu[i] })),
+             ms: payload.ms, chars: job.chars, n: payload.outs.length };
+    render();
+    out.classList.remove("busy");
+  }
+  else if(type === "asrReady"){
+    asrReady = true; asrLoading = false;
+    $("#bar").style.display="none"; $("#pct").textContent=""; $("#files").textContent="";
+    status("speech model ready — press Start listening");
+    if(!preparingOffline) startListening();   // preparing offline must not open the mic
+    else preparingOffline = false;
+  }
+  else if(type === "asrError"){
+    asrLoading = false; busy = false;
+    status("speech failed: " + payload);
+  }
+  else if(type === "transcript"){
+    const job = jobs.get(payload.id); jobs.delete(payload.id);
+    busy = false;
+    const el = document.getElementById("seg"+payload.id);
+    let text = (payload.text||"").replace(/\[.*?\]|\(.*?\)|♪/g,"").trim();
+    if(payload.audioMs){
+      const r = payload.ms / payload.audioMs;
+      rtf = rtf ? rtf*0.7 + r*0.3 : r;
+      retune();
+      const worst = (MAX_SEG_MS * (1 + rtf) + 350) / 1000;
+      if(worst > TARGET_MS/1000 && asrSize !== "fast"){
+        status(`~${worst.toFixed(1)}s behind at best — press "fast" to get under ${(TARGET_MS/1000).toFixed(0)}s`);
+      } else if(listening){
+        status(`listening — about ${worst.toFixed(1)}s behind you`);
+      }
+    }
+    text = repairNames(text);
+    if(!text || isJunk(text)){ el && el.remove(); pump(); return; }
+    if(el){ el.querySelector(".en").textContent = text;
+            el.querySelector(".es").textContent = "translating…"; }
+    $("#t-asr").innerHTML = `${payload.ms.toFixed(0)}<small> ms</small>`;
+    asrJobs.set(payload.id, { ...job, text, asrMs: payload.ms });
+    const pr = protect(text);
+    nameMaps.set("s"+payload.id, [pr.map]);
+    worker.postMessage({ type:"translate",
+                         payload:{ id:"s"+payload.id, lines:[pr.text], fast:true } });
+    pump();
+  }
+  else if(type === "error") fail(payload);
+}
+function fail(msg){
+  $("#err").textContent = msg;
+  $("#load").disabled = false;
+  $("#load").textContent = "Try again";
+  out.classList.remove("busy");
+}
+
+$("#load").onclick = () => {
+  $("#err").textContent = "";
+  $("#load").disabled = true;
+  $("#load").textContent = "Loading…";
+  $("#g-fine").textContent = "Downloading the model. This happens once.";
+  worker = startWorker();
+  worker.postMessage({ type:"load" });
+};
+try{
+  // nothing large is fetched until the service worker can see the request
+
+  const seen = localStorage.getItem("mt-cached");
+  // Data Saver is an explicit request not to pull hundreds of MB unasked.
+  const thrifty = (navigator.connection || {}).saveData === true;
+  if(seen){
+    $("#g-body").textContent = "The model is already cached in this browser. Loading it back now — no download needed.";
+    $("#g-fine").textContent = "";
+    $("#load").click();
+  } else if(!thrifty){
+    $("#g-fine").textContent = "Getting ready to store this for offline use…";
+    $("#g-fine").textContent = "Setting up. This happens once.";
+    $("#load").click();
+    // both at once rather than one after the other
+    setTimeout(() => { if(!asrReady && !asrLoading) loadSpeechModel(); }, 50);
+  }
+}catch(e){}
+
+/* ---- diff + render ---- */
+function esc(s){ return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function segs(raw, neu){
+  const a = raw.split(/\s+/), b = neu.split(/\s+/);
+  if(a.length !== b.length)
+    return [{text:neu, changed: raw!==neu, was: raw!==neu?raw:null}];
+  const parts = [];
+  for(let i=0;i<b.length;i++){
+    const ch = a[i] !== b[i];
+    const prev = parts[parts.length-1];
+    if(prev && prev.changed && ch){           // merge a run of edits
+      prev.text += " " + b[i];
+      prev.was  += " " + a[i];
+    } else if(prev && !prev.changed && !ch){
+      prev.text += " " + b[i];
+    } else {
+      parts.push({text:b[i], changed:ch, was: ch ? a[i] : null});
+    }
+  }
+  return parts;
+}
+const TRIM = /[.,;:!?¡¿»"']+$/;
+function render(){
+  if(!last) return;
+  const pairs = [];
+  out.innerHTML = last.lines.map(l => {
+    if(showRaw) return `<p class="ln">${esc(l.raw)}</p>`;
+    const parts = segs(l.raw, l.neutro);
+    parts.forEach(p => { if(p.changed && p.was){
+      let a=p.was, b=p.text;
+      const ta=(a.match(TRIM)||[""])[0], tb=(b.match(TRIM)||[""])[0];
+      if(ta && ta===tb){ a=a.replace(TRIM,""); b=b.replace(TRIM,""); }
+      pairs.push([a,b]);
+    }});
+    return `<p class="ln">${parts.map(p => p.changed
+      ? `<mark title="model produced: ${esc(p.was||"—")}">${esc(p.text)}</mark>`
+      : esc(p.text)).join(" ")}</p>`;
+  }).join("");
+  chg.innerHTML = pairs.length
+    ? pairs.map(([a,b])=>`<span class="pair"><s>${esc(a)}</s> → <b>${esc(b)}</b></span>`).join("")
+    : `<span class="none">No peninsular forms in this output — the model got it right unaided.</span>`;
+  const ms = $("#t-ms"); if(ms) ms.innerHTML = `${(last.ms/last.n).toFixed(0)}<small> ms/sent</small>`;
+}
+
+/* ---- streaming live translation ----------------------------------------
+ * Latency floor is linguistic, not computational: a clause cannot be
+ * translated before it has been spoken. So instead of waiting for a stop
+ * button, cut the audio at natural pauses (energy-based voice activity),
+ * then transcribe -> translate -> speak each clause as it lands.
+ */
+const SILENCE_MS = 620;   // a real clause boundary, not a mid-phrase breath
+const MIN_SPEECH_MS = 500; // ignore coughs, clicks and breaths
+const TARGET_MS  = 4700;  // end-to-end budget per clause
+const SEG_FLOOR  = 1100;  // below this there is too little context to hear well
+const SEG_CEIL   = 3600;
+let MAX_SEG_MS   = 2600;  // recomputed from measured speed, see retune()
+
+// clause + transcribe(clause) + translate <= TARGET, so clause <= (TARGET-fixed)/(1+rtf)
+function retune(){
+  const fixed = 350;                       // translation and rendering
+  const want = (TARGET_MS - fixed) / (1 + Math.max(rtf, 0.05));
+  MAX_SEG_MS = Math.max(SEG_FLOOR, Math.min(SEG_CEIL, Math.round(want)));
+}
+const RATE = 16000;       // whisper's sample rate; AudioContext resamples for us
+
+let actx=null, node=null, micStream=null, listening=false;
+let asrReady=false, asrLoading=false, asrSize="fast";
+const MB = { fast:77, best:249, max:776 };
+let buf=[], bufLen=0, speechLen=0, silenceLen=0, inSpeech=false;
+let frames=0, peak=0, health=null, floor_=0.006;
+const queue=[]; let busy=false, segNo=0;
+
+const WORKLET = `class Cap extends AudioWorkletProcessor{
+  process(inputs){ const ch=inputs[0] && inputs[0][0];
+    if(ch) this.port.postMessage(ch.slice()); return true; } }
+registerProcessor('cap', Cap);`;
+
+function status(t){ $("#micstatus").textContent = t; }
+
+async function startListening(){
+  if(!ready){ status("load the translation model first"); return; }
+  if(!asrReady){
+    if(asrLoading) return;
+    asrLoading = true;
+    status(`downloading the speech model (~${MB[asrSize]} MB, once)…`);
+    worker.postMessage({ type:"loadAsr", payload:{ size: asrSize } });
+    return;
+  }
+
+  // 1. microphone permission
+  status("requesting microphone…");
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({ audio:{
+      channelCount:1, echoCancellation:true, noiseSuppression:true, autoGainControl:true }});
+  }catch(err){
+    const n = err && err.name || "";
+    status(n === "NotAllowedError" ? "microphone permission denied — allow it in the address bar, then press again"
+         : n === "NotFoundError"  ? "no microphone found"
+         : "microphone unavailable: " + n + " " + (err && err.message || err));
+    return;
+  }
+
+  // 2. audio context. Created after an await, so the user gesture is gone and
+  //    the browser may hand it back suspended — it must be resumed explicitly
+  //    or no audio ever reaches the worklet.
+  try{
+    actx = new (window.AudioContext||window.webkitAudioContext)({ sampleRate: RATE });
+    if(actx.state === "suspended") await actx.resume();
+  }catch(err){ status("audio context failed: "+(err.message||err)); return; }
+
+  // 3. capture node, with a fallback for browsers that reject the worklet
+  const src_ = actx.createMediaStreamSource(micStream);
+  let mode = "worklet";
+  try{
+    await actx.audioWorklet.addModule(URL.createObjectURL(
+      new Blob([WORKLET], {type:"text/javascript"})));
+    node = new AudioWorkletNode(actx, "cap");
+    node.port.onmessage = (e) => onAudio(e.data);
+  }catch(err){
+    mode = "fallback";
+    node = actx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = (e) => onAudio(new Float32Array(e.inputBuffer.getChannelData(0)));
+  }
+  src_.connect(node);
+  // a muted sink keeps the graph pulling without echoing the speaker back
+  const sink = actx.createGain(); sink.gain.value = 0;
+  node.connect(sink); sink.connect(actx.destination);
+
+  listening = true; resetSeg(); frames = 0; peak = 0;
+  $("#mic").classList.add("rec");
+  $("#micdot").className = "dot";
+  $("#miclabel").textContent = "Stop";
+  out.innerHTML = "";
+  status(`listening (${actx.sampleRate} Hz, ${mode}) — speak, it cuts on your pauses`);
+  clearInterval(health);
+  health = setInterval(() => {
+    if(!listening) return;
+    if(frames === 0) status("microphone open but no audio arriving — check the input device");
+    else if(peak < 0.004) status(`listening — very quiet (peak ${peak.toFixed(3)}); speak up or pick another input`);
+    peak = 0;
+  }, 2500);
+}
+
+function stopListening(){
+  listening = false;
+  clearInterval(health);
+  try{ node && node.disconnect(); }catch(e){}
+  try{ micStream && micStream.getTracks().forEach(t=>t.stop()); }catch(e){}
+  try{ actx && actx.close(); }catch(e){}
+  $("#mic").classList.remove("rec");
+  $("#micdot").className = "";
+  $("#miclabel").textContent = "Start listening";
+  $("#meterfill").style.width = "0%";
+  status("stopped");
+}
+
+function resetSeg(){ buf=[]; bufLen=0; speechLen=0; silenceLen=0; inSpeech=false; }
+
+function onAudio(frame){
+  if(!listening) return;
+  let sum=0; for(let i=0;i<frame.length;i++) sum += frame[i]*frame[i];
+  const rms = Math.sqrt(sum/frame.length);
+  $("#meterfill").style.width = Math.min(100, rms*450).toFixed(0)+"%";
+
+  frames++; if(rms > peak) peak = rms;
+  // adapt to the room: track a slow noise floor and trigger above it
+  if(!inSpeech) floor_ = floor_*0.995 + rms*0.005;
+  const thresh = Math.max(0.006, floor_*2.5);
+
+  const ms = frame.length/RATE*1000;
+  const voiced = rms > thresh;
+  if(voiced){ inSpeech = true; speechLen += ms; silenceLen = 0; }
+  else if(inSpeech) silenceLen += ms;
+
+  if(inSpeech){ buf.push(frame); bufLen += frame.length; }
+
+  const longEnough = speechLen >= MIN_SPEECH_MS;
+  if(inSpeech && longEnough && (silenceLen >= SILENCE_MS || speechLen >= MAX_SEG_MS)){
+    const audio = new Float32Array(bufLen);
+    let o=0; for(const f of buf){ audio.set(f,o); o+=f.length; }
+    resetSeg();
+    enqueue(audio);
+  } else if(inSpeech && !longEnough && silenceLen >= SILENCE_MS){
+    resetSeg();   // too short to be speech
+  }
+}
+
+function enqueue(audio){
+  const id = ++segNo;
+  const el = document.createElement("div");
+  el.className = "seg live"; el.id = "seg"+id;
+  el.innerHTML = `<div class="en">…</div><div class="es ph">transcribing…</div>`;
+  out.appendChild(el); out.scrollTop = out.scrollHeight;
+  queue.push({ id, audio, t0: performance.now() });
+  pump();
+}
+let beams = 1, rtf = 0;            // real-time factor: >1 means we are falling behind
+function pump(){
+  if(busy || !queue.length) return;
+  // A backlog means we are slower than speech. Drop the oldest rather than let
+  // every later clause inherit the delay.
+  while(queue.length > 3){
+    const old = queue.shift();
+    jobs.delete(old.id);
+    const el = document.getElementById("seg-"+old.id);
+    el && el.remove();
+  }
+  busy = true;
+  const job = queue.shift();
+  jobs.set(job.id, job);
+  worker.postMessage({ type:"transcribe", payload:{ id:job.id, audio:job.audio } },
+                     [job.audio.buffer]);
+}
+const jobs = new Map();
+
+/* ---- speech out ---- */
+let voiceES = null;
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  voiceES = vs.find(v=>/^es-(419|MX|US|CO|AR)/i.test(v.lang))
+         || vs.find(v=>/^es/i.test(v.lang)) || null;
+}
+pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
+function say(text){
+  if(!text) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = voiceES ? voiceES.lang : "es-MX";
+  if(voiceES) u.voice = voiceES;
+  u.rate = 1.05;
+  speechSynthesis.speak(u);
+}
+$("#say").onclick = () => {
+  const t = last ? last.lines.map(l=>l.neutro).join(" ")
+                 : [...document.querySelectorAll(".seg .es")].map(e=>e.textContent).join(" ");
+  speechSynthesis.cancel(); say(t);
+};
+document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
+  if(asrLoading) return;
+  document.querySelectorAll("#asrsize button")
+    .forEach(x => x.setAttribute("aria-pressed", x === b));
+  if(b.dataset.v !== asrSize){
+    asrSize = b.dataset.v;
+    if(listening) stopListening();
+    asrReady = false;               // a different model has to be fetched
+    asrLoading = false;
+    status(`set to the ${asrSize} speech model — press Start listening (~${MB[asrSize]} MB)`);
+  }
+});
+// Fetch the speech model alongside the translator on first run. Nothing here
+// touches the microphone.
+let autoDone = false;
+function loadSpeechModel(){
+  if(autoDone || asrReady || asrLoading || !worker) return;
+  autoDone = true;
+  preparingOffline = true;
+  asrLoading = true;
+  status(`getting the speech model (~${MB[asrSize]} MB), once\u2026`);
+  worker.postMessage({ type:"loadAsr", payload:{ size: asrSize } });
+}
+
+const namesEl = $("#names");
+if(namesEl){
+  namesEl.value = NAMES.join(", ");
+  namesEl.addEventListener("input", () => {
+    NAMES = namesEl.value.split(",").map(x => x.trim()).filter(Boolean);
+    try{ localStorage.setItem("mt.names", JSON.stringify(NAMES)); }catch{}
+  });
+}
+$("#mic").onclick = () => listening ? stopListening() : startListening();
+
+/* ---- typed-text path (unchanged) ---- */
+let seq = 0, timer = null;
+const pending = new Map();
+
+// ---- proper nouns -------------------------------------------------------
+// Names must survive translation intact: "Kasal" became "Castillo" because the
+// model treats it as the common noun "castle". Swap each name for a token the
+// model passes through (@0@ survives opus-mt in every position tested), then
+// put the name back afterwards.
+function nameList(){
+  return NAMES.filter(Boolean).sort((a,b) => b.length - a.length);
+}
+function protect(text){
+  const map = [];
+  let out = text;
+  nameList().forEach((n) => {
+    const re = new RegExp(`(?<!\\w)${n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}(?!\\w)`, "gi");
+    out = out.replace(re, (hit) => { map.push(hit); return `@${map.length-1}@`; });
+  });
+  return { text: out, map };
+}
+function restore(text, map){
+  return map.length ? text.replace(/@(\d+)@/g, (m,i) => map[+i] ?? m) : text;
+}
+
+// Whisper maps unknown names onto English words it does know: "Kasal" comes
+// back as "Castle". Edit distance on spelling misses that (0.50), because the
+// substitution is by SOUND. "castle" is said /kasl/ -- the t is silent -- so a
+// phonetic key matches it to "kasal" exactly.
+function lev(a,b){
+  const d = Array.from({length:a.length+1}, (_,i) => [i, ...Array(b.length).fill(0)]);
+  for(let j=0;j<=b.length;j++) d[0][j]=j;
+  for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++)
+    d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return d[a.length][b.length];
+}
+const sim = (a,b) => (a && b) ? 1 - lev(a,b)/Math.max(a.length,b.length) : 0;
+
+function phon(w){
+  let x = w.toLowerCase().replace(/[^a-z]/g,"");
+  if(!x) return "";
+  x = x.replace(/^(kn|gn|pn|ae|wr)/,"n").replace(/^x/,"s").replace(/^wh/,"w");
+  x = x.replace(/stl/g,"sl").replace(/stn/g,"sn")      // castle, fasten: silent t
+       .replace(/mb$/,"m").replace(/kn/g,"n");
+  x = x.replace(/ck/g,"k").replace(/ph/g,"f").replace(/sch/g,"sk")
+       .replace(/ch/g,"x").replace(/sh/g,"x").replace(/th/g,"0")
+       .replace(/c(?=[iey])/g,"s").replace(/c/g,"k")
+       .replace(/q/g,"k").replace(/z/g,"s").replace(/x/g,"ks")
+       .replace(/v/g,"f").replace(/w(?![aeiou])/g,"").replace(/y(?![aeiou])/g,"")
+       .replace(/g(?=[iey])/g,"j").replace(/dg/g,"j");
+  x = x[0] + x.slice(1).replace(/[aeiou]/g,"");        // vowels matter only first
+  return x.replace(/(.)\1+/g,"$1");
+}
+
+function repairNames(text){
+  const names = nameList(); if(!names.length) return text;
+  const words = text.split(/(\s+)/);
+  for(const n of names){
+    const nw = n.split(/\s+/).length;
+    const pn = phon(n), bare = n.toLowerCase().replace(/[^a-z]/g,"");
+    for(let i=0;i<words.length;i+=2){
+      const span = words.slice(i, i+nw*2-1).join("");
+      if(!span.trim()) continue;
+      const a = span.toLowerCase().replace(/[^a-z]/g,"");
+      if(!a) continue;
+      if(a === bare) break;                      // already correct
+      // phonetic first, spelling as a fallback
+      if(sim(phon(span), pn) >= 0.70 || sim(a, bare) >= 0.72){
+        const tail = span.match(/[.,!?;:]$/);
+        words.splice(i, nw*2-1, n + (tail ? tail[0] : ""));
+        break;
+      }
+    }
+  }
+  return words.join("");
+}
+
+function run(){
+  if(!ready || listening) return;   // never overwrite live streaming output
+  const text = src.value.trim();
+  if(!text){ last=null; out.innerHTML='<span class="ph">Translation appears here.</span>';
+    chg.innerHTML='<span class="none">Nothing yet.</span>'; return; }
+  const lines = text.split("\n").filter(l=>l.trim());
+  const id = ++seq;
+  pending.set(id, { chars: lines.reduce((n,l)=>n+l.length,0) });
+  out.classList.add("busy");
+  const prot = lines.map(protect);
+  nameMaps.set(id, prot.map(p => p.map));
+  worker.postMessage({ type:"translate",
+                       payload:{ id, lines: prot.map(p => p.text), fast:false } });
+}
+src.addEventListener("input", () => {
+  clearTimeout(timer);
+  if(listening) return;             // typing is ignored while the mic is open
+  timer = setTimeout(run, 500);
+});
+document.querySelectorAll("#ex .chip").forEach(c => c.onclick = () => {
+  if(listening) stopListening();
+  src.value=EX[c.dataset.k]; run(); });
+$("#rawtog").onclick = () => { showRaw=!showRaw;
+  $("#rawtog").textContent = showRaw ? "· show neutro" : "· show raw"; render(); };
+</script>
+</body>
+</html>
