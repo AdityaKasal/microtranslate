@@ -466,6 +466,9 @@ try{
         ? "Downloading now so this works offline later. First load takes a minute."
         : "Downloading the model. This happens once.";
       $("#load").click();
+      // Start the speech model at the same time rather than after. These were
+      // sequential, so the second download did not begin until the first ended.
+      setTimeout(() => { if(!asrReady && !asrLoading) autoOffline(); }, 50);
     });
   }
 }catch(e){}
@@ -537,7 +540,7 @@ const RATE = 16000;       // whisper's sample rate; AudioContext resamples for u
 
 let actx=null, node=null, micStream=null, listening=false;
 let asrReady=false, asrLoading=false, asrSize="best";
-const MB = { fast:80, best:250, max:780 };
+const MB = { fast:54, best:157, max:480 };
 let buf=[], bufLen=0, speechLen=0, silenceLen=0, inSpeech=false;
 let frames=0, peak=0, health=null, floor_=0.006;
 const queue=[]; let busy=false, segNo=0;
@@ -722,7 +725,7 @@ document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
 // on its own. Nothing here touches the microphone.
 let autoDone = false;
 function autoOffline(){
-  if(autoDone || asrReady || asrLoading) return;
+  if(autoDone || asrReady || asrLoading || !worker) return;
   if((navigator.connection || {}).saveData === true){
     offline("data saver is on — press \u201cprepare offline\u201d when you want it stored");
     return;
