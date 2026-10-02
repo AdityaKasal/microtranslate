@@ -5,7 +5,7 @@
 // Chrome showed its offline page instead. Everything the app needs now goes
 // through here: the shell, the library from the CDN, the ONNX runtime WASM,
 // and the model weights.
-const CACHE = "microtranslate-v5";
+const CACHE = "microtranslate-v6";
 const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
 const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
                "./manifest.webmanifest", "./icon.svg",
@@ -18,6 +18,27 @@ const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
 // has its own store, but it cached the speech model and not the translation
 // model, so weights now go here where they can actually be verified.
 const KEEP = /(^|\.)jsdelivr\.net$|(^|\.)unpkg\.com$|(^|\.)huggingface\.co$|(^|\.)hf\.co$/;
+
+
+// HuggingFace serves large weights by redirecting to a signed CDN URL that is
+// different on every request. Cache.put() refuses a redirected response, so
+// the canonical URL was never stored and each visit re-downloaded everything.
+// Rebuild the body as a plain response and store it under the URL we asked for.
+async function store(cache, req, res) {
+  try {
+    if (res.redirected) {
+      const body = await res.clone().blob();
+      const headers = new Headers();
+      for (const h of ["content-type", "content-length"]) {
+        const v = res.headers.get(h);
+        if (v) headers.set(h, v);
+      }
+      await cache.put(req, new Response(body, { status: 200, headers }));
+    } else {
+      await cache.put(req, res.clone());
+    }
+  } catch (err) { /* quota or an uncacheable response: nothing to do */ }
+}
 
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
@@ -56,7 +77,7 @@ self.addEventListener("fetch", (e) => {
       const hit = await cache.match(req);
       if (hit) return hit;
       const res = await fetch(req);
-      if (res && res.status === 200) cache.put(req, res.clone()).catch(() => {});
+      if (res && res.status === 200) await store(cache, req, res);
       return res;
     }
 
@@ -68,7 +89,7 @@ self.addEventListener("fetch", (e) => {
       let res;
       try { res = await fetch(req.url, { cache: "no-cache" }); }
       catch { res = await fetch(req); }
-      if (res && res.status === 200) cache.put(req, res.clone()).catch(() => {});
+      if (res && res.status === 200) await store(cache, req, res);
       return res;
     } catch (err) {
       const hit = await cache.match(req, { ignoreSearch: true });
