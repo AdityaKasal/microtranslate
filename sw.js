@@ -5,7 +5,7 @@
 // Chrome showed its offline page instead. Everything the app needs now goes
 // through here: the shell, the library from the CDN, the ONNX runtime WASM,
 // and the model weights.
-const CACHE = "microtranslate-v1";
+const CACHE = "microtranslate-v2";
 const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
                "./manifest.webmanifest", "./icon.svg"];
 
@@ -40,22 +40,30 @@ self.addEventListener("fetch", (e) => {
 
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    // These are all immutable (versioned library, content-addressed weights),
-    // so a cache hit is always safe and avoids a network round trip.
-    const hit = await cache.match(req, { ignoreSearch: ours });
-    if (hit) return hit;
+
+    // The library and the WASM are versioned in their URL and never change, so
+    // cache-first is both safe and the whole point.
+    if (!ours) {
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res && res.status === 200) cache.put(req, res.clone()).catch(() => {});
+      return res;
+    }
+
+    // Our own files DO change. Cache-first here would freeze every user on the
+    // version they first loaded, with no way to ever ship them a fix, so go to
+    // the network first and keep the cache only as the offline fallback.
     try {
       const res = await fetch(req);
-      // Range requests come back 206 and cannot be stored; everything else can.
       if (res && res.status === 200) cache.put(req, res.clone()).catch(() => {});
       return res;
     } catch (err) {
-      // Offline and not cached. For a navigation, hand back the app shell so
-      // the page still opens rather than showing the browser's offline page.
+      const hit = await cache.match(req, { ignoreSearch: true });
+      if (hit) return hit;
       if (req.mode === "navigate") {
         return (await cache.match("./index.html")) ||
-               (await cache.match("./")) ||
-               Response.error();
+               (await cache.match("./")) || Response.error();
       }
       throw err;
     }
