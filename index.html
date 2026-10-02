@@ -337,6 +337,7 @@ function handle({type, payload}){
     app.classList.add("on");
     try{ localStorage.setItem("mt-cached","1"); }catch(e){}
     src.value = EX.pen; run();
+    autoOffline();
   }
   else if(type === "result" && String(payload.id).startsWith("s")){
     const sid = +String(payload.id).slice(1);
@@ -387,6 +388,7 @@ function handle({type, payload}){
     $("#bar").style.display="none"; $("#pct").textContent=""; $("#files").textContent="";
     status("speech model ready — press Start listening");
     if(!preparingOffline) startListening();   // preparing offline must not open the mic
+    else { preparingOffline = false; setTimeout(askCache, 800); }
   }
   else if(type === "asrError"){
     asrLoading = false; busy = false;
@@ -427,9 +429,15 @@ $("#load").onclick = () => {
   worker.postMessage({ type:"load" });
 };
 try{
-  if(localStorage.getItem("mt-cached")){
+  const seen = localStorage.getItem("mt-cached");
+  // Data Saver is an explicit request not to pull hundreds of MB unasked.
+  const thrifty = (navigator.connection || {}).saveData === true;
+  if(seen){
     $("#g-body").textContent = "The model is already cached in this browser. Loading it back now — no download needed.";
     $("#g-fine").textContent = "";
+    $("#load").click();
+  } else if(!thrifty){
+    $("#g-fine").textContent = "Downloading now so this works offline later. First load takes a minute.";
     $("#load").click();
   }
 }catch(e){}
@@ -663,6 +671,22 @@ document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
     status(`set to the ${asrSize} speech model — press Start listening (~${MB[asrSize]} MB)`);
   }
 });
+// Pull the speech model in the background so the app is genuinely offline-ready
+// on its own. Nothing here touches the microphone.
+let autoDone = false;
+function autoOffline(){
+  if(autoDone || asrReady || asrLoading) return;
+  if((navigator.connection || {}).saveData === true){
+    offline("data saver is on — press \u201cprepare offline\u201d when you want it stored");
+    return;
+  }
+  autoDone = true;
+  preparingOffline = true;
+  asrLoading = true;
+  offline(`getting the speech model (~${MB[asrSize]} MB) so this works offline\u2026`);
+  worker.postMessage({ type:"loadAsr", payload:{ size: asrSize } });
+}
+
 // ---- offline ------------------------------------------------------------
 let swReg = null, preparingOffline = false;
 if("serviceWorker" in navigator){
