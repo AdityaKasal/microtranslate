@@ -402,9 +402,12 @@ function handle({type, payload}){
     if(payload.audioMs){
       const r = payload.ms / payload.audioMs;
       rtf = rtf ? rtf*0.7 + r*0.3 : r;
-      if(rtf > 0.85 && beams > 1) beams = 1;
-      if(rtf > 1.6 && asrSize !== "fast"){
-        status(`falling behind (${rtf.toFixed(1)}x slower than speech) — try the "fast" model`);
+      retune();
+      const worst = (MAX_SEG_MS * (1 + rtf) + 350) / 1000;
+      if(worst > TARGET_MS/1000 && asrSize !== "fast"){
+        status(`~${worst.toFixed(1)}s behind at best — press "fast" to get under ${(TARGET_MS/1000).toFixed(0)}s`);
+      } else if(listening){
+        status(`listening — about ${worst.toFixed(1)}s behind you`);
       }
     }
     text = repairNames(text);
@@ -519,7 +522,17 @@ function render(){
  */
 const SILENCE_MS = 620;   // a real clause boundary, not a mid-phrase breath
 const MIN_SPEECH_MS = 500; // ignore coughs, clicks and breaths
-const MAX_SEG_MS = 5500;  // bounds how long you wait to see a clause
+const TARGET_MS  = 4700;  // end-to-end budget per clause
+const SEG_FLOOR  = 1100;  // below this there is too little context to hear well
+const SEG_CEIL   = 3600;
+let MAX_SEG_MS   = 2600;  // recomputed from measured speed, see retune()
+
+// clause + transcribe(clause) + translate <= TARGET, so clause <= (TARGET-fixed)/(1+rtf)
+function retune(){
+  const fixed = 350;                       // translation and rendering
+  const want = (TARGET_MS - fixed) / (1 + Math.max(rtf, 0.05));
+  MAX_SEG_MS = Math.max(SEG_FLOOR, Math.min(SEG_CEIL, Math.round(want)));
+}
 const RATE = 16000;       // whisper's sample rate; AudioContext resamples for us
 
 let actx=null, node=null, micStream=null, listening=false;
