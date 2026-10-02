@@ -388,7 +388,8 @@ function handle({type, payload}){
     $("#bar").style.display="none"; $("#pct").textContent=""; $("#files").textContent="";
     status("speech model ready — press Start listening");
     if(!preparingOffline) startListening();   // preparing offline must not open the mic
-    else { preparingOffline = false; setTimeout(askCache, 800); }
+    else preparingOffline = false;
+    setTimeout(askCache, 800);   // refresh the readiness line either way
   }
   else if(type === "asrError"){
     asrLoading = false; busy = false;
