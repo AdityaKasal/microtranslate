@@ -5,10 +5,12 @@
 // Chrome showed its offline page instead. Everything the app needs now goes
 // through here: the shell, the library from the CDN, the ONNX runtime WASM,
 // and the model weights.
-const CACHE = "microtranslate-v6";
+const CACHE = "microtranslate-v7";
 const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
 const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
-               "./manifest.webmanifest", "./icon.svg",
+               "./manifest.webmanifest", "./icon.svg", "./icon-192.png",
+               "./icon-512.png", "./icon-maskable-512.png",
+               "./apple-touch-icon.png",
                // The worker imports this at its top level. Verifying offline
                // showed it was not ending up in the cache on its own, and
                // without it nothing runs, so fetch it up front.
