@@ -156,17 +156,17 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
 <div class="wrap">
   <header>
     <h1>micro<em>translate</em></h1>
-    <span class="tag">en → español neutro · runs in your browser</span>
+    <span class="tag">en → español neutro · runs on this machine</span>
     <span class="spacer"></span>
     <button class="theme" id="theme" title="Toggle theme">◐</button>
   </header>
 
   <section class="gate" id="gate">
     <h2 id="g-title">Runs entirely on your device</h2>
-    <p id="g-body">This page carries its own translation model — a 74M-parameter
-      OPUS-MT network quantized to int8. It downloads once (about 119&nbsp;MB),
-      is cached by your browser, and from then on works with no network and no
-      server. Nothing you type ever leaves this machine.</p>
+    <p id="g-body">This app carries its own translation model — a 74M-parameter
+      OPUS-MT network quantized to int8. It is downloaded once, kept on this
+      machine, and from then on works with no network and no server.
+      Nothing you say or type ever leaves this computer.</p>
     <p class="fine" id="g-fine">First load takes a minute on a decent connection.</p>
     <div class="bar" id="bar" style="display:none"><i id="barfill"></i></div>
     <div class="pct" id="pct"></div>
@@ -240,7 +240,7 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
   </div>
 
   <footer id="foot">
-    OPUS-MT en→es exported to ONNX and quantized to int8, executed in-browser by
+    OPUS-MT en→es exported to ONNX and quantized to int8, run on this machine by
     Transformers.js, plus a rewriting layer that forces output into
     <em>español neutro</em>. Highlighted words are the layer's edits — hover to
     see what the model originally produced.
@@ -443,7 +443,7 @@ try{
   // Data Saver is an explicit request not to pull hundreds of MB unasked.
   const thrifty = (navigator.connection || {}).saveData === true;
   if(seen){
-    $("#g-body").textContent = "The model is already cached in this browser. Loading it back now — no download needed.";
+    $("#g-body").textContent = "The model is already on this machine. Loading it back now — no download needed.";
     $("#g-fine").textContent = "";
     $("#load").click();
   } else if(!thrifty){

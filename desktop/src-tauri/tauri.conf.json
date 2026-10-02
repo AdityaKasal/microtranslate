@@ -24,15 +24,15 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "msi",
-      "nsis"
-    ],
+    "targets": "all",
     "icon": [
       "icons/icon.ico",
       "icons/icon.png"
     ],
     "shortDescription": "English to neutral Latin American Spanish, on your device.",
-    "longDescription": "Speech in, neutral Latin American Spanish out. Runs entirely on this machine with no server, no API and no internet after first setup."
+    "longDescription": "Speech in, neutral Latin American Spanish out. Runs entirely on this machine with no server, no API and no internet after first setup.",
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
   }
 }
