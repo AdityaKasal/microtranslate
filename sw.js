@@ -6,7 +6,8 @@
 // through here: the shell, the library from the CDN, the ONNX runtime WASM,
 // and the model weights.
 const CACHE = "microtranslate-v1";
-const SHELL = ["./", "./index.html", "./neutro.js", "./manifest.webmanifest"];
+const SHELL = ["./", "./index.html", "./neutro.js", "./worker.js",
+               "./manifest.webmanifest", "./icon.svg"];
 
 // The library and the ONNX runtime WASM. Model weights are deliberately NOT
 // here: Transformers.js already caches those itself, and duplicating 370MB in

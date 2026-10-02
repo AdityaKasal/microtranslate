@@ -282,71 +282,8 @@ $("#theme").onclick = () => {
 };
 
 /* the model runs in a worker so the page never freezes during inference */
-const WORKER_SRC = `
-import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
-env.allowLocalModels = false;
-let pipe = null, asr = null, asrName = "";
-self.onmessage = async (e) => {
-  const { type, payload } = e.data;
-  if (type === "load") {
-    try {
-      pipe = await pipeline("translation", "Xenova/opus-mt-en-es", {
-        dtype: "q8",
-        progress_callback: (p) => self.postMessage({ type:"progress", payload:p }),
-      });
-      self.postMessage({ type:"ready", payload:{ device: pipe?.model?.device || "wasm" } });
-    } catch (err) {
-      self.postMessage({ type:"error", payload:String(err && err.message || err) });
-    }
-    return;
-  }
-  if (type === "loadAsr") {
-    try {
-      asrName = { fast:  "Xenova/whisper-base.en",
-                  best:  "Xenova/whisper-small.en",
-                  max:   "Xenova/whisper-medium.en"
-                }[(payload && payload.size) || "best"] || "Xenova/whisper-small.en";
-      asr = await pipeline("automatic-speech-recognition", asrName, {
-        dtype: "q8",
-        progress_callback: (p) => self.postMessage({ type:"progress", payload:p }),
-      });
-      self.postMessage({ type:"asrReady" });
-    } catch (err) {
-      self.postMessage({ type:"asrError", payload:String(err && err.message || err) });
-    }
-    return;
-  }
-  if (type === "transcribe") {
-    try {
-      const t0 = performance.now();
-      const r = await asr(payload.audio, {
-        chunk_length_s: 30, stride_length_s: 5,
-        num_beams: asrName.includes("base") ? 2 : 4,   // beams buy accuracy
-        condition_on_previous_text: false });
-      self.postMessage({ type:"transcript",
-        payload:{ id: payload.id, text:(r.text||"").trim(), ms: performance.now()-t0 } });
-    } catch (err) {
-      self.postMessage({ type:"asrError", payload:String(err && err.message || err) });
-    }
-    return;
-  }
-  if (type === "translate") {
-    try {
-      const t0 = performance.now();
-      const res = await pipe(payload.lines, { max_new_tokens: 320,
-        num_beams: payload.fast ? 1 : 4, do_sample: false });
-      const ms = performance.now() - t0;
-      const outs = (Array.isArray(res) ? res : [res]).map(r => r.translation_text);
-      self.postMessage({ type:"result", payload:{ id:payload.id, outs, ms } });
-    } catch (err) {
-      self.postMessage({ type:"error", payload:String(err && err.message || err) });
-    }
-  }
-};`;
-
 function startWorker(){
-  const url = URL.createObjectURL(new Blob([WORKER_SRC], {type:"text/javascript"}));
-  const w = new Worker(url, { type:"module" });
+  const w = new Worker("./worker.js", { type:"module" });
   w.onmessage = (e) => handle(e.data);
   w.onerror = (e) => fail(e.message || "worker failed to start");
   return w;
@@ -449,7 +386,7 @@ function handle({type, payload}){
     asrReady = true; asrLoading = false;
     $("#bar").style.display="none"; $("#pct").textContent=""; $("#files").textContent="";
     status("speech model ready — press Start listening");
-    startListening();
+    if(!preparingOffline) startListening();   // preparing offline must not open the mic
   }
   else if(type === "asrError"){
     asrLoading = false; busy = false;
@@ -727,7 +664,7 @@ document.querySelectorAll("#asrsize button").forEach(b => b.onclick = () => {
   }
 });
 // ---- offline ------------------------------------------------------------
-let swReg = null;
+let swReg = null, preparingOffline = false;
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("./sw.js").then(r => { swReg = r; askCache(); })
     .catch(() => offline("service worker unavailable — offline use will not work"));
@@ -756,7 +693,7 @@ function askCache(){
 // disconnect, instead of discovering a missing file with no network.
 async function prepareOffline(){
   const btn = $("#prep");
-  btn.disabled = true;
+  btn.disabled = true; preparingOffline = true;
   try{
     if(!ready){
       offline("downloading the translation model\u2026");
@@ -785,7 +722,7 @@ async function prepareOffline(){
     setTimeout(askCache, 1500);
   }catch(err){
     offline("could not finish: " + (err.message || err));
-  }finally{ btn.disabled = false; }
+  }finally{ btn.disabled = false; preparingOffline = false; }
 }
 $("#prep").onclick = prepareOffline;
 
