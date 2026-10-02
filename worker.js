@@ -29,7 +29,7 @@ self.onmessage = async (e) => {
                   max:   "Xenova/whisper-medium.en"
                 }[(payload && payload.size) || "best"] || "Xenova/whisper-small.en";
       asr = await pipeline("automatic-speech-recognition", asrName, {
-        dtype: "int8",   // same 8-bit precision as q8, ~37% smaller download
+        dtype: "q8",   // the only 8-bit build with BOTH encoder and decoder
         progress_callback: (p) => self.postMessage({ type:"progress", payload:p }),
       });
       self.postMessage({ type:"asrReady" });
