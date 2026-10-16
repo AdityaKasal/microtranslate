@@ -193,6 +193,10 @@ footer{margin-top:22px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
                placeholder="Aditya Kasal, Guadalupe, ..." />
       </div>
       <div class="grp">
+        <label class="lbl">voice</label>
+        <select id="voice" class="names" style="min-width:13rem"></select>
+      </div>
+      <div class="grp">
         <label class="lbl">examples</label>
         <div class="examples" id="ex">
           <button class="chip" data-k="pen">peninsular vocabulary</button>
@@ -695,11 +699,50 @@ const jobs = new Map();
 
 /* ---- speech out ---- */
 let voiceES = null;
-function pickVoice(){
-  const vs = speechSynthesis.getVoices();
-  voiceES = vs.find(v=>/^es-(419|MX|US|CO|AR)/i.test(v.lang))
-         || vs.find(v=>/^es/i.test(v.lang)) || null;
+
+// Latin American Spanish varieties, most to least preferred. es-ES is Castilian
+// and is deliberately last: it pronounces "gracias" with the Spain "th", which
+// undoes the register work in the text.
+const LATAM = /^es[-_](419|MX|US|CO|AR|CL|PE|VE|EC|GT|CR|PA|UY|PY|BO|DO|HN|NI|SV|PR)/i;
+
+function spanishVoices(){
+  const all = speechSynthesis.getVoices().filter(v => /^es/i.test(v.lang));
+  const latam = all.filter(v => LATAM.test(v.lang));
+  const other = all.filter(v => !LATAM.test(v.lang));
+  return { latam, other, all: latam.concat(other) };
 }
+
+function pickVoice(){
+  const { latam, all } = spanishVoices();
+  if(!all.length) { voiceES = null; return; }
+  let saved = null;
+  try { saved = localStorage.getItem("mt.voice"); } catch {}
+  voiceES = (saved && all.find(v => v.name === saved)) || latam[0] || all[0];
+  fillVoicePicker();
+}
+
+function fillVoicePicker(){
+  const sel = $("#voice"); if(!sel) return;
+  const { latam, other } = spanishVoices();
+  if(sel.dataset.n === String(latam.length + other.length)) return;  // unchanged
+  sel.dataset.n = String(latam.length + other.length);
+  sel.innerHTML = "";
+  const group = (label, list) => {
+    if(!list.length) return;
+    const g = document.createElement("optgroup"); g.label = label;
+    for(const v of list){
+      const o = document.createElement("option");
+      o.value = v.name;
+      o.textContent = `${v.name} · ${v.lang}`;
+      g.appendChild(o);
+    }
+    sel.appendChild(g);
+  };
+  group("Latin American", latam);
+  group("Spain (not recommended)", other);
+  if(voiceES) sel.value = voiceES.name;
+}
+
 pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
 function say(text){
   if(!text) return;
@@ -817,6 +860,18 @@ if(namesEl){
   namesEl.addEventListener("input", () => {
     NAMES = namesEl.value.split(",").map(x => x.trim()).filter(Boolean);
     try{ localStorage.setItem("mt.names", JSON.stringify(NAMES)); }catch{}
+  });
+}
+const voiceSel = $("#voice");
+if(voiceSel){
+  voiceSel.addEventListener("change", () => {
+    const v = speechSynthesis.getVoices().find(x => x.name === voiceSel.value);
+    if(v){
+      voiceES = v;
+      try{ localStorage.setItem("mt.voice", v.name); }catch{}
+      speechSynthesis.cancel();
+      say("Listo. Ahora escuchas esta voz.");   // so the choice is audible at once
+    }
   });
 }
 $("#mic").onclick = () => listening ? stopListening() : startListening();
