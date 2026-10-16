@@ -709,15 +709,27 @@ function spanishVoices(){
   const all = speechSynthesis.getVoices().filter(v => /^es/i.test(v.lang));
   const latam = all.filter(v => LATAM.test(v.lang));
   const other = all.filter(v => !LATAM.test(v.lang));
+  const rank = (v) => {
+    const i = PREFERRED.findIndex(re => re.test(v.name));
+    return i === -1 ? PREFERRED.length : i;
+  };
+  latam.sort((a,b) => rank(a) - rank(b));
   return { latam, other, all: latam.concat(other) };
 }
+
+// Known-good Latin American voices by name, best first. Paulina is the macOS
+// Mexican Spanish voice; Sabina, Dalia and Jorge are the Windows equivalents.
+// Falls through to any Latin American voice on machines that have none of them.
+const PREFERRED = [/^paulina/i, /^sabina/i, /^dalia/i, /^jorge/i,
+                   /^juan/i, /^salome/i, /^isabela/i];
 
 function pickVoice(){
   const { latam, all } = spanishVoices();
   if(!all.length) { voiceES = null; return; }
   let saved = null;
   try { saved = localStorage.getItem("mt.voice"); } catch {}
-  voiceES = (saved && all.find(v => v.name === saved)) || latam[0] || all[0];
+  const liked = PREFERRED.map(re => latam.find(v => re.test(v.name))).find(Boolean);
+  voiceES = (saved && all.find(v => v.name === saved)) || liked || latam[0] || all[0];
   fillVoicePicker();
 }
 
